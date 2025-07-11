@@ -31,7 +31,7 @@ export const CTASection = () => {
               className="border-white text-white hover:bg-white/10"
               asChild
             >
-              <Link to="/explore">Browse All Cards</Link>
+              <Link to="/all-cards">Browse All Cards</Link>
             </Button>
           </div>
         </div>
