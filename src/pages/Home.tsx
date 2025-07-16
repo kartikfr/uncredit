@@ -7,7 +7,7 @@ import { CTASection } from "@/components/home/CTASection";
 
 const Home = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100">
       <HeroSection />
       <USPFeaturesSection />
       <FeaturedCategoriesSection />

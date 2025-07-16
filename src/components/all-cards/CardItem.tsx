@@ -15,6 +15,7 @@ interface CardItemProps {
   onRemoveFromCompare: (card: Card) => void;
   isInCompareList: boolean;
   canAddToCompare: boolean;
+  eligibleAliases?: string[];
 }
 
 const CardItem: React.FC<CardItemProps> = ({ 
@@ -24,7 +25,8 @@ const CardItem: React.FC<CardItemProps> = ({
   onAddToCompare,
   onRemoveFromCompare,
   isInCompareList,
-  canAddToCompare
+  canAddToCompare,
+  eligibleAliases
 }) => {
   const formatRating = (rating: number) => {
     return rating.toFixed(1);
@@ -53,9 +55,11 @@ const CardItem: React.FC<CardItemProps> = ({
     return typeColors[type.toLowerCase()] || 'bg-gray-100 text-gray-800';
   };
 
+  const isEligible = eligibleAliases && card.seo_card_alias && eligibleAliases.includes(card.seo_card_alias);
+
   return (
     <UICard 
-      className="hover-lift shadow-card animate-slide-up group"
+      className="hover-lift shadow-card animate-slide-up group relative"
       style={{animationDelay: `${index * 50}ms`}}
     >
       <CardContent className="p-6">
@@ -230,11 +234,20 @@ const CardItem: React.FC<CardItemProps> = ({
               className="bg-primary hover:bg-primary/90 group-hover:bg-primary/80 transition-colors"
               asChild
             >
-              <Link to={`/card/${card.id}`} state={{ card }}>
+              <Link to={`/card/${card.seo_card_alias || card.id}`} state={{ card }}>
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </Link>
             </Button>
+            {/* Eligibility Strip (moved below View Details button) */}
+            {isEligible && (
+              <div className="w-full flex items-center justify-center mt-2">
+                <div className="bg-gradient-to-r from-green-500 via-emerald-400 to-green-600 text-white text-xs sm:text-sm font-semibold py-1 px-4 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in border-b-2 border-green-700" style={{letterSpacing: '0.5px'}}>
+                  <svg className="w-4 h-4 text-white mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  You are Eligible for this card
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
