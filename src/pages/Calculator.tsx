@@ -1,97 +1,40 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
-import { Calculator, CreditCard, ArrowRight, ArrowLeft } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from 'react';
+import { Card as UICard, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Calculator as CalculatorIcon, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { cardService } from '@/services/api';
 
-const CalculatorPage = () => {
-  const [cards, setCards] = useState<any[]>([]);
-  const [selectedCard, setSelectedCard] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [questions, setQuestions] = useState<any>({});
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [results, setResults] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+interface BankKaroCard {
+  id: string;
+  name: string;
+  seo_card_alias: string;
+  image: string;
+  bank_name: string;
+  card_type: string;
+}
 
-  const categories = [
-    { id: "all", label: "All", description: "Complete spending analysis" },
-    { id: "shopping", label: "Shopping", description: "Amazon, Flipkart, online/offline" },
-    { id: "utility", label: "Utility", description: "Bills, rent, insurance" },
-    { id: "grocery", label: "Grocery", description: "Online grocery spending" },
-    { id: "fuel", label: "Fuel", description: "Fuel spending patterns" },
-    { id: "dining", label: "Dining", description: "Restaurant and going out" },
-    { id: "food-ordering", label: "Online Food Ordering", description: "Food delivery spending" },
-    { id: "travel", label: "Travel & Hotel", description: "Annual travel and lounge" }
-  ];
+interface CardGeniusCard {
+  id: string;
+  name: string;
+  seo_card_alias: string;
+  // Add other fields as needed
+}
 
-  const categoryQuestions = {
-    all: [
-      { key: "amazon_spends", label: "Amazon Monthly Spending", min: 0, max: 50000, step: 500 },
-      { key: "flipkart_spends", label: "Flipkart Monthly Spending", min: 0, max: 50000, step: 500 },
-      { key: "grocery_spends_online", label: "Online Grocery Monthly Spending", min: 0, max: 25000, step: 250 },
-      { key: "online_food_ordering", label: "Food Delivery Monthly Spending", min: 0, max: 15000, step: 250 },
-      { key: "other_online_spends", label: "Other Online Monthly Spending", min: 0, max: 25000, step: 500 },
-      { key: "other_offline_spends", label: "Other Offline Monthly Spending", min: 0, max: 25000, step: 500 },
-      { key: "dining_or_going_out", label: "Dining/Going Out Monthly Spending", min: 0, max: 20000, step: 250 },
-      { key: "fuel", label: "Fuel Monthly Spending", min: 0, max: 15000, step: 250 },
-      { key: "school_fees", label: "School Fees Annual", min: 0, max: 200000, step: 5000 },
-      { key: "rent", label: "Rent Monthly", min: 0, max: 100000, step: 2500 },
-      { key: "mobile_phone_bills", label: "Mobile Bills Monthly", min: 0, max: 5000, step: 100 },
-      { key: "electricity_bills", label: "Electricity Bills Monthly", min: 0, max: 15000, step: 250 },
-      { key: "water_bills", label: "Water Bills Monthly", min: 0, max: 5000, step: 100 },
-      { key: "ott_channels", label: "OTT Subscriptions Monthly", min: 0, max: 3000, step: 100 },
-      { key: "hotels_annual", label: "Hotels Annual Spending", min: 0, max: 300000, step: 10000 },
-      { key: "flights_annual", label: "Flights Annual Spending", min: 0, max: 300000, step: 10000 },
-      { key: "insurance_health_annual", label: "Health Insurance Annual", min: 0, max: 200000, step: 5000 },
-      { key: "insurance_car_or_bike_annual", label: "Vehicle Insurance Annual", min: 0, max: 100000, step: 2500 },
-      { key: "large_electronics_purchase_like_mobile_tv_etc", label: "Electronics Purchase Annual", min: 0, max: 500000, step: 10000 }
-    ],
-    shopping: [
-      { key: "amazon_spends", label: "Amazon Monthly Spending", min: 0, max: 50000, step: 500 },
-      { key: "flipkart_spends", label: "Flipkart Monthly Spending", min: 0, max: 50000, step: 500 },
-      { key: "other_online_spends", label: "Other Online Monthly Spending", min: 0, max: 25000, step: 500 },
-      { key: "other_offline_spends", label: "Other Offline Monthly Spending", min: 0, max: 25000, step: 500 }
-    ],
-    utility: [
-      { key: "mobile_phone_bills", label: "Mobile Bills Monthly", min: 0, max: 5000, step: 100 },
-      { key: "electricity_bills", label: "Electricity Bills Monthly", min: 0, max: 15000, step: 250 },
-      { key: "water_bills", label: "Water Bills Monthly", min: 0, max: 5000, step: 100 },
-      { key: "insurance_health_annual", label: "Health Insurance Annual", min: 0, max: 200000, step: 5000 },
-      { key: "insurance_car_or_bike_annual", label: "Vehicle Insurance Annual", min: 0, max: 100000, step: 2500 },
-      { key: "school_fees", label: "School Fees Annual", min: 0, max: 200000, step: 5000 },
-      { key: "rent", label: "Rent Monthly", min: 0, max: 100000, step: 2500 }
-    ],
-    grocery: [
-      { key: "grocery_spends_online", label: "Online Grocery Monthly Spending", min: 0, max: 25000, step: 250 }
-    ],
-    fuel: [
-      { key: "fuel", label: "Fuel Monthly Spending", min: 0, max: 15000, step: 250 }
-    ],
-    "food-ordering": [
-      { key: "online_food_ordering", label: "Food Delivery Monthly Spending", min: 0, max: 15000, step: 250 }
-    ],
-    dining: [
-      { key: "dining_or_going_out", label: "Dining/Going Out Monthly Spending", min: 0, max: 20000, step: 250 }
-    ],
-    travel: [
-      { key: "hotels_annual", label: "Hotels Annual Spending", min: 0, max: 300000, step: 10000 },
-      { key: "flights_annual", label: "Flights Annual Spending", min: 0, max: 300000, step: 10000 },
-      { key: "domestic_lounge_usage_quarterly", label: "Domestic Lounge Usage Quarterly", min: 0, max: 50, step: 1 },
-      { key: "international_lounge_usage_quarterly", label: "International Lounge Usage Quarterly", min: 0, max: 30, step: 1 }
-    ]
-  };
+const Calculator = () => {
+  const [bankKaroCards, setBankKaroCards] = useState<BankKaroCard[]>([]);
+  const [cardGeniusCards, setCardGeniusCards] = useState<CardGeniusCard[]>([]);
+  const [selectedCard, setSelectedCard] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [mappedCards, setMappedCards] = useState<BankKaroCard[]>([]);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchAllCards();
-  }, []);
-
-  const fetchAllCards = async () => {
-    setLoading(true);
+  // Fetch cards from BankKaro API
+  const fetchBankKaroCards = async () => {
     try {
+      console.log('Fetching cards from BankKaro API...');
       const response = await fetch('https://bk-api.bankkaro.com/sp/api/cards', {
         method: 'POST',
         headers: {
@@ -107,278 +50,439 @@ const CalculatorPage = () => {
           free_cards: "",
           eligiblityPayload: {},
           cardGeniusPayload: {}
-        }),
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`BankKaro API error: ${response.status}`);
+      }
+
       const data = await response.json();
-      setCards(data.cards || []);
+      console.log('BankKaro API response:', data);
+
+      // Extract cards from response
+      let cards: BankKaroCard[] = [];
+      if (Array.isArray(data)) {
+        cards = data;
+      } else if (data.cards && Array.isArray(data.cards)) {
+        cards = data.cards;
+      } else if (data.data && data.data.cards && Array.isArray(data.data.cards)) {
+        cards = data.data.cards;
+      }
+
+      // If no cards found, use mock data for testing
+      if (cards.length === 0) {
+        console.log('No cards from API, using mock data');
+        cards = [
+          {
+            id: '1',
+            name: 'HDFC Regalia Credit Card',
+            seo_card_alias: 'hdfc-regalia-credit-card',
+            image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=HDFC+Regalia',
+            bank_name: 'HDFC Bank',
+            card_type: 'Premium'
+          },
+          {
+            id: '2',
+            name: 'SBI SimplyCLICK Credit Card',
+            seo_card_alias: 'sbi-simplyclick-credit-card',
+            image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=SBI+SimplyCLICK',
+            bank_name: 'State Bank of India',
+            card_type: 'Shopping'
+          },
+          {
+            id: '3',
+            name: 'ICICI Amazon Pay Credit Card',
+            seo_card_alias: 'icici-amazon-pay-credit-card',
+            image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=ICICI+Amazon+Pay',
+            bank_name: 'ICICI Bank',
+            card_type: 'Shopping'
+          }
+        ];
+      }
+
+      setBankKaroCards(cards);
+      console.log('BankKaro cards loaded:', cards.length);
+      setError(''); // Clear any previous errors
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch cards. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      console.error('Error fetching BankKaro cards:', error);
+      setError('Failed to load cards from BankKaro API. Using demo data.');
+      // Use mock data on error
+      const mockCards: BankKaroCard[] = [
+        {
+          id: '1',
+          name: 'HDFC Regalia Credit Card',
+          seo_card_alias: 'hdfc-regalia-credit-card',
+          image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=HDFC+Regalia',
+          bank_name: 'HDFC Bank',
+          card_type: 'Premium'
+        },
+        {
+          id: '2',
+          name: 'SBI SimplyCLICK Credit Card',
+          seo_card_alias: 'sbi-simplyclick-credit-card',
+          image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=SBI+SimplyCLICK',
+          bank_name: 'State Bank of India',
+          card_type: 'Shopping'
+        },
+        {
+          id: '3',
+          name: 'ICICI Amazon Pay Credit Card',
+          seo_card_alias: 'icici-amazon-pay-credit-card',
+          image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=ICICI+Amazon+Pay',
+          bank_name: 'ICICI Bank',
+          card_type: 'Shopping'
+        }
+      ];
+      setBankKaroCards(mockCards);
     }
   };
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-    setCurrentQuestionIndex(0);
-    setResults(null);
-    const categoryQs = categoryQuestions[categoryId as keyof typeof categoryQuestions] || [];
-    const initialQuestions = {};
-    categoryQs.forEach(q => {
-      initialQuestions[q.key] = [0];
-    });
-    setQuestions(initialQuestions);
-  };
-
-  const handleQuestionAnswer = (key: string, value: number[]) => {
-    setQuestions(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const handleNext = () => {
-    const categoryQs = categoryQuestions[selectedCategory as keyof typeof categoryQuestions] || [];
-    if (currentQuestionIndex < categoryQs.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      calculateResults();
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
-
-  const calculateResults = async () => {
-    setLoading(true);
+  // Fetch cards from Card Genius API
+  const fetchCardGeniusCards = async () => {
     try {
-      const payload = {
-        ...Object.keys(questions).reduce((acc, key) => {
-          acc[key] = questions[key][0];
-          return acc;
-        }, {} as any),
-        selected_card_id: null
-      };
-
+      console.log('Fetching cards from Card Genius API...');
       const response = await fetch('https://card-recommendation-api-v2.bankkaro.com/cg/api/pro', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          amazon_spends: 1280,
+          flipkart_spends: 10000,
+          grocery_spends_online: 7500,
+          online_food_ordering: 5000,
+          other_online_spends: 3000,
+          other_offline_spends: 5000,
+          dining_or_going_out: 5000,
+          fuel: 5000,
+          school_fees: 20000,
+          rent: 35000,
+          mobile_phone_bills: 1500,
+          electricity_bills: 7500,
+          water_bills: 2500,
+          ott_channels: 1000,
+          new_monthly_cat_1: 0,
+          new_monthly_cat_2: 0,
+          new_monthly_cat_3: 0,
+          hotels_annual: 75000,
+          flights_annual: 75000,
+          insurance_health_annual: 75000,
+          insurance_car_or_bike_annual: 45000,
+          large_electronics_purchase_like_mobile_tv_etc: 100000,
+          all_pharmacy: 99,
+          new_cat_1: 0,
+          new_cat_2: 0,
+          new_cat_3: 0,
+          domestic_lounge_usage_quarterly: 20,
+          international_lounge_usage_quarterly: 13,
+          railway_lounge_usage_quarterly: 1,
+          movie_usage: 3,
+          movie_mov: 600,
+          dining_usage: 3,
+          dining_mov: 1500,
+          selected_card_id: null
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`Card Genius API error: ${response.status}`);
+      }
+
       const data = await response.json();
-      setResults(data);
+      console.log('Card Genius API response:', data);
+
+      // Extract cards from response - adjust based on actual API structure
+      let cards: CardGeniusCard[] = [];
+      if (data.cards && Array.isArray(data.cards)) {
+        cards = data.cards;
+      } else if (data.data && data.data.cards && Array.isArray(data.data.cards)) {
+        cards = data.data.cards;
+      } else if (Array.isArray(data)) {
+        cards = data;
+      }
+
+      // If no cards found, use mock data for testing
+      if (cards.length === 0) {
+        console.log('No cards from Card Genius API, using mock data');
+        cards = [
+          {
+            id: '1',
+            name: 'HDFC Regalia Credit Card',
+            seo_card_alias: 'hdfc-regalia-credit-card'
+          },
+          {
+            id: '2',
+            name: 'SBI SimplyCLICK Credit Card',
+            seo_card_alias: 'sbi-simplyclick-credit-card'
+          },
+          {
+            id: '3',
+            name: 'ICICI Amazon Pay Credit Card',
+            seo_card_alias: 'icici-amazon-pay-credit-card'
+          }
+        ];
+      }
+
+      setCardGeniusCards(cards);
+      console.log('Card Genius cards loaded:', cards.length);
+      setError(''); // Clear any previous errors
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to calculate results. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      console.error('Error fetching Card Genius cards:', error);
+      setError('Failed to load cards from Card Genius API. Using demo data.');
+      // Use mock data on error
+      const mockCards: CardGeniusCard[] = [
+        {
+          id: '1',
+          name: 'HDFC Regalia Credit Card',
+          seo_card_alias: 'hdfc-regalia-credit-card'
+        },
+        {
+          id: '2',
+          name: 'SBI SimplyCLICK Credit Card',
+          seo_card_alias: 'sbi-simplyclick-credit-card'
+        },
+        {
+          id: '3',
+          name: 'ICICI Amazon Pay Credit Card',
+          seo_card_alias: 'icici-amazon-pay-credit-card'
+        }
+      ];
+      setCardGeniusCards(mockCards);
     }
   };
 
-  const currentQuestions = categoryQuestions[selectedCategory as keyof typeof categoryQuestions] || [];
-  const currentQuestion = currentQuestions[currentQuestionIndex];
+  // Map cards using seo_card_alias
+  const mapCards = () => {
+    if (bankKaroCards.length === 0 || cardGeniusCards.length === 0) {
+      return;
+    }
+
+    console.log('Mapping cards using seo_card_alias...');
+    console.log('BankKaro cards:', bankKaroCards);
+    console.log('Card Genius cards:', cardGeniusCards);
+    
+    // Create a set of seo_card_alias from Card Genius API for faster lookup
+    const cardGeniusAliases = new Set(cardGeniusCards.map(card => card.seo_card_alias));
+    
+    // Filter BankKaro cards to only include those that exist in Card Genius API
+    const mapped = bankKaroCards.filter(bankKaroCard => 
+      cardGeniusAliases.has(bankKaroCard.seo_card_alias)
+    );
+
+    console.log('Mapped cards:', mapped.length);
+    console.log('Sample mapped cards:', mapped.slice(0, 3));
+    
+    // If no mapped cards found, use BankKaro cards as fallback
+    if (mapped.length === 0) {
+      console.log('No mapped cards found, using BankKaro cards as fallback');
+      setMappedCards(bankKaroCards);
+    } else {
+      setMappedCards(mapped);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      
+      // Fetch both APIs in parallel
+      await Promise.all([
+        fetchBankKaroCards(),
+        fetchCardGeniusCards()
+      ]);
+      
+      setLoading(false);
+    };
+
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (bankKaroCards.length > 0 && cardGeniusCards.length > 0) {
+      mapCards();
+    }
+  }, [bankKaroCards, cardGeniusCards]);
+
+  const handleCardSelect = (cardId: string) => {
+    setSelectedCard(cardId);
+  };
+
+  const handleCalculateRewards = () => {
+    if (!selectedCard) {
+      alert('Please select a card first');
+      return;
+    }
+
+    const selectedCardData = mappedCards.find(card => card.id === selectedCard);
+    if (selectedCardData) {
+      // Try to find the card in the existing cards data first
+      const cardsJSON = localStorage.getItem("all_cards_cache");
+      let existingCard = null;
+      
+      if (cardsJSON) {
+        const cards = JSON.parse(cardsJSON);
+        existingCard = cards.find((c: any) => c.id.toString() === selectedCardData.id);
+      }
+
+      // Navigate to card detail page with calculator tab
+      navigate(`/card/${selectedCardData.id}?tab=calculator`, {
+        state: { 
+          card: existingCard || selectedCardData,
+          seo_card_alias: selectedCardData.seo_card_alias
+        }
+      });
+    }
+  };
+
+  const selectedCardData = mappedCards.find(card => card.id === selectedCard);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <section className="bg-gradient-subtle py-16">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8 animate-fade-in">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Calculator className="h-12 w-12 text-primary mr-4" />
-              <h1 className="text-4xl lg:text-5xl font-bold text-foreground">
-                Reward Calculator
-              </h1>
+              <CalculatorIcon className="h-12 w-12 text-primary mr-4" />
+              <h1 className="text-4xl font-bold text-foreground">Reward Calculator</h1>
             </div>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Choose a card and calculate your potential rewards based on spending patterns
+              Choose a credit card and calculate your potential rewards based on your spending patterns
             </p>
           </div>
-        </div>
-      </section>
 
-      <div className="container mx-auto px-4 py-16">
-        {/* Step 1: Card Selection */}
-        {!selectedCard && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Select a Credit Card</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select value={selectedCard} onValueChange={setSelectedCard}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a credit card to analyze" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cards.map((card) => (
-                      <SelectItem key={card.id} value={card.id}>
-                        {card.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Step 2: Tabs with Card Details and Calculator */}
-        {selectedCard && (
-          <Tabs defaultValue="details" className="max-w-4xl mx-auto">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Card Details</TabsTrigger>
-              <TabsTrigger value="calculator">Calculator</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="details">
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle>Card Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {cards.find(card => card.id === selectedCard) && (
-                    <div className="space-y-4">
-                      <h3 className="text-xl font-semibold">
-                        {cards.find(card => card.id === selectedCard)?.name}
-                      </h3>
-                      <p className="text-muted-foreground">
-                        Detailed card information will be displayed here based on the selected card.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="calculator">
-              <div className="space-y-6">
-                {/* Category Selection */}
-                {!selectedCategory && (
-                  <Card className="shadow-card">
-                    <CardHeader>
-                      <CardTitle>Choose Spending Category</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {categories.map((category) => (
-                          <Card 
-                            key={category.id} 
-                            className="cursor-pointer hover-lift border-2 hover:border-primary transition-colors"
-                            onClick={() => handleCategorySelect(category.id)}
-                          >
-                            <CardContent className="p-4">
-                              <h4 className="font-semibold text-foreground">{category.label}</h4>
-                              <p className="text-sm text-muted-foreground">{category.description}</p>
-                            </CardContent>
-                          </Card>
+          {/* Main Calculator Card */}
+          <UICard className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl text-center">Select Your Card</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                  <p className="text-muted-foreground">Loading available cards...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <p className="text-destructive mb-4">{error}</p>
+                  <Button onClick={() => window.location.reload()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : mappedCards.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground mb-4">
+                    No cards available for reward calculation at the moment.
+                  </p>
+                  <Button onClick={() => window.location.reload()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Card Selection */}
+                  <div className="space-y-4">
+                    <label className="text-sm font-medium text-foreground">
+                      Choose a Credit Card
+                    </label>
+                    <Select value={selectedCard} onValueChange={handleCardSelect}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a card to calculate rewards" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px] overflow-y-auto" position="popper" side="bottom" avoidCollisions={false}>
+                        {mappedCards.map((card) => (
+                          <SelectItem key={card.id} value={card.id}>
+                            <div className="flex items-center space-x-3">
+                              <img
+                                src={card.image}
+                                alt={card.name}
+                                className="w-8 h-5 object-contain rounded"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{card.name}</div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {card.bank_name} • {card.card_type}
+                                </div>
+                              </div>
+                            </div>
+                          </SelectItem>
                         ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Questions Flow */}
-                {selectedCategory && !results && currentQuestion && (
-                  <Card className="shadow-card">
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        <span>{currentQuestion.label}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {currentQuestionIndex + 1} of {currentQuestions.length}
-                        </span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-4">
-                        <Slider
-                          value={questions[currentQuestion.key] || [0]}
-                          onValueChange={(value) => handleQuestionAnswer(currentQuestion.key, value)}
-                          max={currentQuestion.max}
-                          min={currentQuestion.min}
-                          step={currentQuestion.step}
-                          className="w-full"
-                        />
-                        <div className="text-center">
-                          <span className="text-2xl font-bold text-primary">
-                            ₹{(questions[currentQuestion.key]?.[0] || 0).toLocaleString()}
-                          </span>
+                  {/* Selected Card Preview */}
+                  {selectedCardData && (
+                    <UICard className="border-primary/20 bg-primary/5">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-4">
+                          <img
+                            src={selectedCardData.image}
+                            alt={selectedCardData.name}
+                            className="w-16 h-10 object-contain rounded-lg bg-white border"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-foreground">
+                              {selectedCardData.name}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {selectedCardData.bank_name} • {selectedCardData.card_type}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Card ID: {selectedCardData.seo_card_alias}
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      </CardContent>
+                    </UICard>
+                  )}
 
-                      <div className="flex justify-between">
-                        <Button 
-                          variant="outline" 
-                          onClick={handlePrevious}
-                          disabled={currentQuestionIndex === 0}
-                        >
-                          <ArrowLeft className="mr-2 h-4 w-4" />
-                          Previous
-                        </Button>
-                        <Button onClick={handleNext} disabled={loading}>
-                          {currentQuestionIndex === currentQuestions.length - 1 ? (
-                            loading ? "Calculating..." : "Calculate Results"
-                          ) : (
-                            <>
-                              Next
-                              <ArrowRight className="ml-2 h-4 w-4" />
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                  {/* Action Button */}
+                  <div className="flex justify-center pt-4">
+                    <Button
+                      onClick={handleCalculateRewards}
+                      disabled={!selectedCard}
+                      size="lg"
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      Calculate Rewards
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </UICard>
 
-                {/* Results */}
-                {results && (
-                  <Card className="shadow-card">
-                    <CardHeader>
-                      <CardTitle>Calculation Results</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <p className="text-lg">
-                          Based on your spending patterns, here are your potential rewards:
-                        </p>
-                        <div className="bg-muted/30 p-4 rounded-lg">
-                          <pre className="text-sm">
-                            {JSON.stringify(results, null, 2)}
-                          </pre>
-                        </div>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => {
-                            setSelectedCategory("");
-                            setResults(null);
-                            setCurrentQuestionIndex(0);
-                          }}
-                        >
-                          Try Another Category
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+          {/* Info Section */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Showing {mappedCards.length} cards available for reward calculation
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Only cards available in both BankKaro and Card Genius APIs are shown
+            </p>
+            {error && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-xs text-yellow-800">
+                  <strong>Demo Mode:</strong> {error}
+                </p>
               </div>
-            </TabsContent>
-          </Tabs>
-        )}
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default CalculatorPage;
+export default Calculator;

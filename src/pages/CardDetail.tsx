@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card as UICard, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Star, Users, ArrowLeft, CheckCircle, XCircle, Info } from "lucide-react";
@@ -15,12 +18,122 @@ function isObjectWithHeaderOrName(obj: unknown): obj is { header?: string; name?
   return typeof obj === 'object' && obj !== null && ('header' in obj || 'name' in obj);
 }
 
+const CATEGORY_QUESTIONS = [
+  {
+    name: "All",
+    keys: [
+      "amazon_spends", "flipkart_spends", "other_online_spends", "other_offline_spends", "grocery_spends_online", "online_food_ordering", "fuel", "dining_or_going_out", "flights_annual", "hotels_annual", "domestic_lounge_usage_quarterly", "international_lounge_usage_quarterly", "mobile_phone_bills", "electricity_bills", "water_bills", "insurance_health_annual", "insurance_car_or_bike_annual", "rent", "school_fees"
+    ]
+  },
+  {
+    name: "Online Shopping",
+    keys: ["amazon_spends", "flipkart_spends", "other_online_spends", "other_offline_spends"]
+  },
+  {
+    name: "Paying Bills",
+    keys: ["mobile_phone_bills", "electricity_bills", "water_bills", "insurance_health_annual", "insurance_car_or_bike_annual", "rent", "school_fees"]
+  },
+  { name: "Groceries", keys: ["grocery_spends_online"] },
+  { name: "Ordering Food", keys: ["online_food_ordering"] },
+  { name: "Filling Fuel Up", keys: ["fuel"] },
+  { name: "Dining Out", keys: ["dining_or_going_out"] },
+  { name: "Flights and Hotels", keys: ["flights_annual", "hotels_annual", "domestic_lounge_usage_quarterly", "international_lounge_usage_quarterly"] }
+];
+const QUESTION_META = {
+  amazon_spends: { label: "How much do you spend on Amazon in a month? 🛍️", min: 0, max: 50000, step: 500 },
+  flipkart_spends: { label: "How much do you spend on Flipkart in a month? 📦", min: 0, max: 50000, step: 500 },
+  other_online_spends: { label: "How much do you spend on other online shopping? 💸", min: 0, max: 30000, step: 500 },
+  other_offline_spends: { label: "How much do you spend at local shops or offline stores monthly? 🏪", min: 0, max: 30000, step: 500 },
+  grocery_spends_online: { label: "How much do you spend on groceries (Blinkit,Zepto etc.) every month? 🥦", min: 0, max: 20000, step: 500 },
+  online_food_ordering: { label: "How much do you spend on food delivery apps in a month? 🛵🍜", min: 0, max: 15000, step: 250 },
+  fuel: { label: "How much do you spend on fuel in a month? ⛽", min: 0, max: 15000, step: 500 },
+  dining_or_going_out: { label: "How much do you spend on dining out in a month? 🥗", min: 0, max: 20000, step: 500 },
+  flights_annual: { label: "How much do you spend on flights in a year? ✈️", min: 0, max: 300000, step: 5000 },
+  hotels_annual: { label: "How much do you spend on hotel stays in a year? 🛌", min: 0, max: 200000, step: 5000 },
+  domestic_lounge_usage_quarterly: { label: "How often do you visit domestic airport lounges in a year? 🇮🇳", min: 0, max: 50, step: 1 },
+  international_lounge_usage_quarterly: { label: "Plus, what about international airport lounges? 🌎", min: 0, max: 20, step: 1 },
+  mobile_phone_bills: { label: "How much do you spend on recharging your mobile or Wi-Fi monthly? 📱", min: 0, max: 5000, step: 100 },
+  electricity_bills: { label: "What’s your average monthly electricity bill? ⚡️", min: 0, max: 10000, step: 200 },
+  water_bills: { label: "And what about your monthly water bill? 💧", min: 0, max: 5000, step: 100 },
+  insurance_health_annual: { label: "How much do you pay for health or term insurance annually? 🛡️", min: 0, max: 100000, step: 2000 },
+  insurance_car_or_bike_annual: { label: "How much do you pay for car or bike insurance annually?", min: 0, max: 50000, step: 1000 },
+  rent: { label: "How much do you pay for house rent every month?", min: 0, max: 100000, step: 1000 },
+  school_fees: { label: "How much do you pay in school fees monthly?", min: 0, max: 50000, step: 1000 },
+};
+const ALL_KEYS = Object.keys(QUESTION_META);
+
 const CardDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [card, setCard] = useState<CardType | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'calculator'>('details');
+
+  // Add state for calculator tab
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["All"]);
+  const [calcValues, setCalcValues] = useState<Record<string, number>>(() => Object.fromEntries(ALL_KEYS.map(k => [k, 0])));
+  const [calcLoading, setCalcLoading] = useState(false);
+  const [calcError, setCalcError] = useState("");
+  const [calcResult, setCalcResult] = useState<any>(null);
+  const [calcResultList, setCalcResultList] = useState<any[]>([]);
+
+  const handleCategoryToggle = (cat: string) => {
+    setSelectedCategories(prev => {
+      if (cat === "All") return ["All"];
+      if (prev.includes(cat)) {
+        const filtered = prev.filter(c => c !== cat);
+        return filtered.length === 0 ? ["All"] : filtered;
+      } else {
+        return prev.filter(c => c !== "All").concat(cat);
+      }
+    });
+  };
+
+  const visibleKeys = selectedCategories.includes("All")
+    ? ALL_KEYS
+    : CATEGORY_QUESTIONS.filter(c => selectedCategories.includes(c.name)).flatMap(c => c.keys);
+
+  const handleCalcValueChange = (key: string, value: number) => {
+    setCalcValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleCalcSubmit = async () => {
+    setCalcLoading(true);
+    setCalcError("");
+    setCalcResult(null);
+    setCalcResultList([]);
+    try {
+      const payload: Record<string, any> = {};
+      for (const k of ALL_KEYS) {
+        payload[k] = visibleKeys.includes(k) ? calcValues[k] : "";
+      }
+      payload.selected_card_id = null;
+      const response = await fetch('https://card-recommendation-api-v2.bankkaro.com/cg/api/pro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json();
+      // Find the card for this detail page by seo_card_alias
+      const found = (data.savings || []).find((c: any) => c.seo_card_alias === card.seo_card_alias);
+      setCalcResult(found || null);
+      setCalcResultList(data.savings || []);
+    } catch (err) {
+      setCalcError('Failed to calculate savings. Please try again.');
+    } finally {
+      setCalcLoading(false);
+    }
+  };
+
+  // Check URL parameters for tab selection
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'calculator') {
+      setActiveTab('calculator');
+    }
+  }, [location.search]);
 
   useEffect(() => {
     // Scroll to top with smooth animation on mount
@@ -255,8 +368,127 @@ const CardDetail = () => {
             </div>
           )}
           {activeTab === 'calculator' && (
-            <div className="p-8 bg-white rounded shadow-card min-h-[200px] flex items-center justify-center text-muted-foreground">
-              <span>Calculator coming soon...</span>
+            <div className="space-y-6">
+              {/* Category Selection */}
+              <UICard className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-lg">Choose Categories</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {CATEGORY_QUESTIONS.map(cat => (
+                      <Button
+                        key={cat.name}
+                        variant={selectedCategories.includes(cat.name) ? "default" : "outline"}
+                        className={selectedCategories.includes(cat.name) ? "bg-primary text-white" : ""}
+                        onClick={() => handleCategoryToggle(cat.name)}
+                      >
+                        {cat.name}
+                      </Button>
+                    ))}
+                  </div>
+                  {/* Dynamic Questions */}
+                  <div className="space-y-6">
+                    {visibleKeys.map(key => (
+                      <div key={key} className="flex flex-col gap-2">
+                        <label className="font-medium text-foreground mb-1">{QUESTION_META[key].label}</label>
+                        <div className="flex items-center gap-4">
+                          <Slider
+                            min={QUESTION_META[key].min}
+                            max={Math.max(QUESTION_META[key].max, calcValues[key])}
+                            step={QUESTION_META[key].step}
+                            value={[calcValues[key]]}
+                            onValueChange={val => handleCalcValueChange(key, val[0])}
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            className="border rounded px-2 py-1 w-24 text-right text-base focus:outline-primary"
+                            value={calcValues[key]}
+                            onChange={e => handleCalcValueChange(key, Math.max(0, Number(e.target.value)))}
+                          />
+                          {key.includes("lounge") ? <span className="ml-1 text-xs text-muted-foreground">times</span> : <span className="ml-1 text-xs text-muted-foreground">{key.includes('annual') ? 'per year' : 'per month'}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end mt-6">
+                    <Button onClick={handleCalcSubmit} disabled={calcLoading} className="bg-primary text-white">
+                      {calcLoading ? "Calculating..." : "Calculate Savings"}
+                    </Button>
+                  </div>
+                  {calcError && <div className="text-destructive text-sm mt-4">{calcError}</div>}
+                  {calcResult && (
+                    <div className="mt-8">
+                      <UICard className="shadow-card border-primary/30">
+                        <CardHeader>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            Net Savings for this Card
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-2xl font-bold text-green-700">₹{Number(calcResult.total_savings_yearly || 0) - Number(calcResult.joining_fees || 0)}</span>
+                            <div className="flex gap-4 text-sm mt-2">
+                              <span>Total Savings: <span className="font-semibold text-green-600">₹{Number(calcResult.total_savings_yearly).toLocaleString()}</span></span>
+                              <span>Joining Fees: <span className="font-semibold text-muted-foreground">₹{Number(calcResult.joining_fees).toLocaleString()}</span></span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </UICard>
+                    </div>
+                  )}
+                  {calcResultList.length > 0 && (
+                    <div className="mt-8">
+                      <UICard className="shadow-card border-primary/30">
+                        <CardHeader>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            All Cards - Net Savings
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto max-w-full">
+                            <div className="max-h-[400px] overflow-y-auto rounded-lg border border-muted/30 shadow-md bg-white">
+                              <Table className="min-w-[700px]">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Card Name</TableHead>
+                                    <TableHead className="text-center">Total Savings</TableHead>
+                                    <TableHead className="text-center">Joining Fees</TableHead>
+                                    <TableHead className="text-center">Net Savings</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {calcResultList
+                                    .map(card => ({
+                                      ...card,
+                                      _netSavings: (Number(card.total_savings_yearly) || 0) - (Number(card.joining_fees) || 0)
+                                    }))
+                                    .sort((a, b) => b._netSavings - a._netSavings)
+                                    .slice(0, 10)
+                                    .map((card, idx) => (
+                                      <TableRow key={card.id || card.card_name || idx} className={card.seo_card_alias === (calcResult?.seo_card_alias || card.seo_card_alias) ? "bg-primary/10" : ""}>
+                                        <TableCell className="font-semibold text-foreground text-base leading-tight line-clamp-2">{card.card_name}</TableCell>
+                                        <TableCell className="text-center font-bold text-green-600 text-base">₹{Number(card.total_savings_yearly).toLocaleString()}</TableCell>
+                                        <TableCell className="text-center text-muted-foreground text-base">₹{Number(card.joining_fees).toLocaleString()}</TableCell>
+                                        <TableCell className="text-center font-bold text-green-700 text-base">₹{card._netSavings.toLocaleString()}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            {calcResultList.length > 10 && (
+                              <div className="text-center text-xs text-muted-foreground mt-2">
+                                Showing top 10 cards. Scroll for more.
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </UICard>
+                    </div>
+                  )}
+                </CardContent>
+              </UICard>
             </div>
           )}
         </div>
