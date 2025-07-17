@@ -3,6 +3,6 @@
 # Supabase Configuration
 VITE_SUPABASE_URL=https://yurfpubenqaotwnemuwg.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1cmZwdWJlbnFhb3R3bmVtdXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwNTY2MDYsImV4cCI6MjA2NzYzMjYwNn0.0YY2TikwGgBJC7FsubXGB28uEoCLv40UaZiAxG4UxyQ
-
+ 
 # Note: Your OpenAI API key is now stored securely in Supabase
 # No need to add VITE_OPENAI_API_KEY here - it's fetched from Supabase automatically 

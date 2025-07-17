@@ -1,3 +1,6 @@
+# UnCredit - AI-Powered Credit Card Recommendations
+# Robots.txt for UnCredit.com
+
 User-agent: Googlebot
 Allow: /
 
@@ -12,3 +15,9 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# Sitemap (add when available)
+# Sitemap: https://uncredit.com/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
