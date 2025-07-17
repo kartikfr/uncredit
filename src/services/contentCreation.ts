@@ -646,11 +646,31 @@ Don't forget to like and subscribe for more financial insights! 🔔
   async getCardsForSelection(): Promise<any[]> {
     console.log('🔍 Fetching detailed cards from BankKaro API...');
     
+    // Force fresh API call for debugging - remove cache check temporarily
+    // if (this.cardCache.length > 0 && Date.now() < this.cacheExpiry) {
+    //   console.log('📋 Using cached cards:', this.cardCache.length);
+    //   return this.cardCache;
+    // }
+    
     try {
+      console.log('🌐 Making BankKaro API request to:', `${this.baseURL}/cards`);
+      console.log('📤 Request payload:', {
+        slug: "",
+        banks_ids: [],
+        card_networks: [],
+        annualFees: "",
+        credit_score: "",
+        sort_by: "",
+        free_cards: "",
+        eligiblityPayload: {},
+        cardGeniusPayload: {}
+      });
+      
       const response = await fetch(`${this.baseURL}/cards`, {
         method: 'POST',
-        headers: {
+        headers: { 
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           slug: "",
@@ -664,23 +684,40 @@ Don't forget to like and subscribe for more financial insights! 🔔
           cardGeniusPayload: {}
         }),
       });
-
-      if (!response.ok) {
-        throw new Error(`BankKaro API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const cards = Array.isArray(data) ? data : data.cards || data.data?.cards || [];
       
-      console.log('📋 Detailed cards fetched:', cards.length);
+      console.log('📡 BankKaro API response status:', response.status);
+      console.log('📡 BankKaro API response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ BankKaro API error response:', errorText);
+        throw new Error(`BankKaro API error: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📊 BankKaro API raw response structure:', {
+        isArray: Array.isArray(data),
+        hasCards: 'cards' in data,
+        hasData: 'data' in data,
+        keys: Object.keys(data || {})
+      });
+      
+      const cards = Array.isArray(data) ? data : data.cards || data.data?.cards || [];
+      console.log('✅ Detailed cards fetched successfully:', cards.length);
+      console.log('📋 First few cards:', cards.slice(0, 3).map(c => ({ id: c.id, name: c.name, bank: c.bank_name })));
+      
+      // Cache the results
+      this.cardCache = cards;
+      this.cacheExpiry = Date.now() + this.CACHE_DURATION;
+      
       return cards;
     } catch (error) {
-      console.error('❌ Error fetching cards:', error);
+      console.error('❌ Error fetching cards from BankKaro API:', error);
+      console.log('🔄 Falling back to enhanced mock cards...');
       
-      // Return enhanced mock cards
-      return [
+      const mockCards = [
         {
-          id: 'mock-card-1',
+          id: 'hdfc-regalia',
           name: 'HDFC Regalia Credit Card',
           seo_card_alias: 'hdfc-regalia-credit-card',
           bank_name: 'HDFC Bank',
@@ -701,7 +738,7 @@ Don't forget to like and subscribe for more financial insights! 🔔
           image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=HDFC+Regalia'
         },
         {
-          id: 'mock-card-2',
+          id: 'sbi-simplyclick',
           name: 'SBI SimplyCLICK Credit Card',
           seo_card_alias: 'sbi-simplyclick-credit-card',
           bank_name: 'State Bank of India',
@@ -720,104 +757,144 @@ Don't forget to like and subscribe for more financial insights! 🔔
           exclusion_spends: 'Fuel, insurance, utilities',
           exclusion_earnings: 'Government transactions, cash advances',
           image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=SBI+SimplyCLICK'
+        },
+        {
+          id: 'icici-makemytrip',
+          name: 'ICICI Bank MakeMyTrip Credit Card',
+          seo_card_alias: 'icici-makemytrip-credit-card',
+          bank_name: 'ICICI Bank',
+          card_network: 'Visa',
+          annual_fee: '₹1,500',
+          joining_fee: '₹2,500',
+          key_features: ['5X rewards on MakeMyTrip', '2X on dining', '1X on all other spends'],
+          benefits: ['MakeMyTrip vouchers', 'Dining privileges', 'Travel insurance'],
+          reward_conversion_rate: '1 point = ₹0.20',
+          redemption_options: 'MakeMyTrip vouchers, gift cards, statement credit',
+          age_criteria: '18-65 years',
+          income_salaried: '₹6,00,000 per annum',
+          income_self_emp: '₹8,00,000 per annum',
+          crif: '700+',
+          crif_self_emp: '700+',
+          exclusion_spends: 'Fuel, insurance, utilities',
+          exclusion_earnings: 'Government transactions, cash advances',
+          image: 'https://via.placeholder.com/200x120/1f2937/ffffff?text=ICICI+MakeMyTrip'
         }
       ];
+      
+      // Cache mock cards
+      this.cardCache = mockCards;
+      this.cacheExpiry = Date.now() + this.CACHE_DURATION;
+      
+      return mockCards;
     }
   }
 
-  // Enhanced content generation with RAG
+  // Force refresh card data (clear cache and fetch fresh)
+  async forceRefreshCards(): Promise<any[]> {
+    console.log('🔄 Force refreshing card data...');
+    this.cardCache = [];
+    this.cacheExpiry = 0;
+    return await this.getCardsForSelection();
+  }
+
   async generateContent(request: ContentCreationRequest): Promise<GeneratedContent> {
     console.log('🚀 Enhanced RAG content generation starting...');
-    console.log('📋 Request details:', {
-      platforms: request.platforms,
-      selectedCards: request.selectedCards,
-      tone: request.tone,
-      prompt: request.prompt,
-      format: request.selectedFormat
-    });
-
+    console.log('📋 Request details:', request);
+    
     try {
-      // Perform RAG search to get detailed card data
-      const ragResults = await this.performRAGSearch(request.prompt, request.selectedCards);
-
-      // Fetch detailed card data for RAG
-      const allCards = await this.getCardsForSelection();
+      // Force fresh card data fetch (no cache)
+      console.log('🔄 Fetching fresh card data for content generation...');
+      const allCards = await this.forceRefreshCards();
+      
+      console.log('📊 All available cards:', allCards.map(c => ({ id: c.id, name: c.name, bank: c.bank_name })));
+      console.log('🎯 Selected card IDs:', request.selectedCards);
+      
+      // Match selected cards by id or seo_card_alias
       const cardData: CardData[] = request.selectedCards.map(cardId => {
-        const card = allCards.find(c => c.id === cardId);
-        return card ? {
-          id: card.id,
-          name: card.name,
-          seo_card_alias: card.seo_card_alias,
-          bank_name: card.bank_name,
-          card_network: card.card_network,
-          annual_fee: card.annual_fee,
-          joining_fee: card.joining_fee,
-          key_features: card.key_features || [],
-          benefits: card.benefits || [],
-          reward_conversion_rate: card.reward_conversion_rate,
-          redemption_options: card.redemption_options,
-          age_criteria: card.age_criteria,
-          income_salaried: card.income_salaried,
-          income_self_emp: card.income_self_emp,
-          crif: card.crif,
-          crif_self_emp: card.crif_self_emp,
-          exclusion_spends: card.exclusion_spends,
-          exclusion_earnings: card.exclusion_earnings,
-          product_usps: card.product_usps,
-          tags: card.tags,
-          image: card.image
-        } : null;
+        const card = allCards.find(c => c.id === cardId || c.seo_card_alias === cardId);
+        if (!card) {
+          console.warn(`⚠️ Card not found for ID: ${cardId}`);
+        }
+        return card;
       }).filter(Boolean) as CardData[];
-
-      console.log('📊 Card data prepared for RAG:', cardData.length, 'cards');
-
+      
+      console.log('✅ Matched cards for RAG:', cardData.map(c => ({ id: c.id, name: c.name, bank: c.bank_name })));
+      
+      if (!cardData.length) {
+        throw new Error(`No matching cards found for selectedCards: ${request.selectedCards.join(', ')}`);
+      }
+      
+      // Perform RAG search with detailed logging
+      console.log('🔍 Starting RAG search...');
+      const ragResults = await this.performRAGSearch(request.prompt, cardData.map(card => card.id));
+      console.log('📊 RAG search results:', ragResults);
+      
       // Prepare context for RAG
       const context = {
         platforms: request.platforms,
         selectedFormat: request.selectedFormat,
         cardData,
         tone: request.tone,
-        ragResults // Pass RAG results to the context
+        ragResults
       };
-
+      
+      console.log('📝 Context prepared for OpenAI:', {
+        platforms: context.platforms,
+        cardCount: context.cardData.length,
+        ragResultsCount: context.ragResults.length,
+        tone: context.tone
+      });
+      
       // Generate content using RAG
-      const contentResponse = await this.makeOpenAIRequest(request.prompt, context);
+      let contentResponse: string;
+      try {
+        console.log('🤖 Calling OpenAI API...');
+        contentResponse = await this.makeOpenAIRequest(request.prompt, context);
+        console.log('✅ OpenAI API response received');
+      } catch (err) {
+        console.error('❌ OpenAI API error, falling back to mock content:', err);
+        contentResponse = this.generateMockContent(context);
+      }
       
       let rawContent: { [platform: string]: string };
       try {
         rawContent = JSON.parse(contentResponse);
+        console.log('✅ OpenAI response parsed successfully');
       } catch (parseError) {
         console.error('❌ Failed to parse OpenAI response:', parseError);
-        // Fallback to mock content
+        console.log('📄 Raw response:', contentResponse);
         rawContent = JSON.parse(this.generateMockContent(context));
       }
-
-      // Map platform names from API response to display names
+      
+      // Normalize and map platform keys
       const content: { [platform: string]: string } = {};
       const platformMapping: { [key: string]: string } = {
         'linkedin': 'LinkedIn',
         'twitter': 'X (Twitter)',
+        'x (twitter)': 'X (Twitter)',
         'instagram': 'Instagram',
         'youtube': 'YouTube'
       };
-
+      
       Object.entries(rawContent).forEach(([platformKey, contentText]) => {
-        const displayName = platformMapping[platformKey] || platformKey;
+        const normalizedKey = platformKey.trim().toLowerCase();
+        const displayName = platformMapping[normalizedKey] || platformKey;
         content[displayName] = contentText;
+        console.log(`📱 Mapped ${platformKey} -> ${displayName} (${contentText.length} chars)`);
       });
-
+      
       console.log('🔧 Platform mapping applied:', {
         rawContent: Object.keys(rawContent),
         mappedContent: Object.keys(content)
       });
-
+      
       // Create references from card data
       const references: ContentReference[] = cardData.map(card => ({
         text: `${card.name} - ${card.bank_name}`,
         source: 'BankKaro API',
         cardName: card.name
       }));
-
+      
       const generatedContent: GeneratedContent = {
         id: `content-${Date.now()}`,
         platforms: request.platforms,
@@ -831,15 +908,23 @@ Don't forget to like and subscribe for more financial insights! 🔔
         createdAt: new Date(),
         status: 'draft'
       };
-
+      
       console.log('✅ RAG-enhanced content generated successfully');
+      console.log('📊 Final content summary:', {
+        id: generatedContent.id,
+        platforms: Object.keys(generatedContent.content),
+        totalChars: Object.values(generatedContent.content).reduce((sum, text) => sum + text.length, 0),
+        cardCount: generatedContent.cardData.length,
+        referenceCount: generatedContent.references.length
+      });
+      
       this.saveToHistory(generatedContent);
       this.saveGeneratedContent(generatedContent);
       
       return generatedContent;
     } catch (error) {
       console.error('❌ Enhanced content generation error:', error);
-      throw error;
+      throw new Error(`Content generation failed: ${error.message}. Please try again or check your API keys.`);
     }
   }
 
