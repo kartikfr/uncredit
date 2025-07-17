@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Mapping Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4caf50; background-color: #f1f8e9; }
+        .error { border-color: #f44336; background-color: #ffebee; }
+        .info { border-color: #2196f3; background-color: #e3f2fd; }
+        .content-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Platform Mapping Test</h1>
+    
+    <div class="container">
+        <h2>Test Platform Name Mapping</h2>
+        <div id="mapping-test" class="test-section info">
+            <button onclick="testPlatformMapping()">Test Platform Mapping</button>
+            <div id="mapping-result"></div>
+        </div>
+    </div>
+
+    <script>
+        function testPlatformMapping() {
+            const resultDiv = document.getElementById('mapping-result');
+            
+            // Simulate the raw content from OpenAI API
+            const rawContent = {
+                'linkedin': '🚀 Exciting insights on ICICI MAKEMYTRIP CREDIT CARD!',
+                'twitter': '💳 Just analyzed ICICI MAKEMYTRIP CREDIT CARD - here\'s what you need to know!',
+                'instagram': '💳✨ Your credit card upgrade guide is here!',
+                'youtube': '🎥 Complete Guide to ICICI MAKEMYTRIP CREDIT CARD'
+            };
+
+            // Platform mapping (same as in the service)
+            const platformMapping = {
+                'linkedin': 'LinkedIn',
+                'twitter': 'X (Twitter)',
+                'instagram': 'Instagram',
+                'youtube': 'YouTube'
+            };
+
+            // Apply mapping
+            const mappedContent = {};
+            Object.entries(rawContent).forEach(([platformKey, contentText]) => {
+                const displayName = platformMapping[platformKey] || platformKey;
+                mappedContent[displayName] = contentText;
+            });
+
+            resultDiv.innerHTML = `
+                <div class="success">✅ Platform mapping test successful!</div>
+                
+                <h3>Raw Content (from OpenAI API):</h3>
+                <div class="content-display">
+                    ${JSON.stringify(rawContent, null, 2)}
+                </div>
+                
+                <h3>Mapped Content (for ContentEditor):</h3>
+                <div class="content-display">
+                    ${JSON.stringify(mappedContent, null, 2)}
+                </div>
+                
+                <h3>Mapping Results:</h3>
+                <ul>
+                    <li>Raw keys: ${Object.keys(rawContent).join(', ')}</li>
+                    <li>Mapped keys: ${Object.keys(mappedContent).join(', ')}</li>
+                    <li>Content for 'X (Twitter)': ${mappedContent['X (Twitter)'] || 'Not found'}</li>
+                    <li>Content for 'LinkedIn': ${mappedContent['LinkedIn'] || 'Not found'}</li>
+                </ul>
+            `;
+            
+            document.getElementById('mapping-test').className = 'test-section success';
+        }
+
+        // Auto-run test on load
+        window.onload = function() {
+            testPlatformMapping();
+        };
+    </script>
+</body>
+</html> 

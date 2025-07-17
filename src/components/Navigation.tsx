@@ -214,12 +214,12 @@ export const Navigation = () => {
             >
               <Button 
                 size="sm" 
-                className="hidden sm:flex bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                className="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                 asChild
               >
-                <Link to="/all-cards" className="flex items-center space-x-2">
-                  <Target className="h-4 w-4" />
-                  <span>Find Best Card</span>
+                <Link to="/create-content" className="flex items-center space-x-2">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Create Content</span>
                 </Link>
               </Button>
             </motion.div>
@@ -309,12 +309,12 @@ export const Navigation = () => {
                     transition={{ duration: 0.3, delay: 0.6 }}
                   >
                     <Button 
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300" 
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300" 
                       asChild
                     >
-                      <Link to="/all-cards" className="flex items-center justify-center space-x-2">
-                        <Target className="h-4 w-4" />
-                        <span>Find Best Card</span>
+                      <Link to="/create-content" className="flex items-center justify-center space-x-2">
+                        <Sparkles className="h-4 w-4" />
+                        <span>Create Content</span>
                       </Link>
                     </Button>
                   </motion.div>

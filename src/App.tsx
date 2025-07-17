@@ -14,8 +14,16 @@ import CardGenius from "./pages/CardGenius";
 import Compare from "./pages/Compare";
 import BeatMyCard from "./pages/BeatMyCard";
 import NotFound from "./pages/NotFound";
+import CreateContent from "./pages/CreateContent";
 
 const queryClient = new QueryClient();
+
+// Environment check for debugging
+console.log('🔧 App.tsx: Environment check:', {
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Not set',
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Not set',
+  VITE_OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY ? 'Set' : 'Not set'
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,6 +41,7 @@ const App = () => (
           <Route path="/genius" element={<CardGenius />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/beat-my-card" element={<BeatMyCard />} />
+          <Route path="/create-content" element={<CreateContent />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

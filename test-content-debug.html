@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Generation Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        .result { background: #f8f9fa; padding: 10px; border-radius: 3px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Content Generation Debug Test</h1>
+    
+    <div class="test-section info">
+        <h3>Test Configuration</h3>
+        <p><strong>Prompt:</strong> "what is the joining fee ICICI MAKEMYTRIP CREDIT CARD, and what are the product benefit of it"</p>
+        <p><strong>Platform:</strong> LinkedIn</p>
+        <p><strong>Format:</strong> Full Post</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 1: Test Supabase Connection</h3>
+        <button onclick="testSupabase()">Test Supabase Connection</button>
+        <div id="supabase-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 2: Test Content Generation</h3>
+        <button onclick="testContentGeneration()">Generate Content</button>
+        <div id="generation-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 3: Test BankKaro API</h3>
+        <button onclick="testBankKaro()">Test BankKaro API</button>
+        <div id="bankkaro-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Generated Content Preview</h3>
+        <textarea id="content-preview" placeholder="Generated content will appear here..."></textarea>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            supabaseUrl: 'https://yurfpubenqaotwnemuwg.supabase.co',
+            supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1cmZwdWJlbnFhb3R3bmVtdXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwNTY2MDYsImV4cCI6MjA2NzYzMjYwNn0.0YY2TikwGgBJC7FsubXGB28uEoCLv40UaZiAxG4UxyQ',
+            testPrompt: "what is the joining fee ICICI MAKEMYTRIP CREDIT CARD, and what are the product benefit of it"
+        };
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+        }
+
+        async function testSupabase() {
+            const resultDiv = document.getElementById('supabase-result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('supabase-result', 'Testing Supabase connection...', 'info');
+                
+                const response = await fetch(`${config.supabaseUrl}/rest/v1/api_keys?select=*&limit=1`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': config.supabaseAnonKey,
+                        'Authorization': `Bearer ${config.supabaseAnonKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                log('supabase-result', `✅ Supabase connection successful`, 'success');
+                log('supabase-result', `📊 Found ${data.length} API keys`, 'info');
+                
+                if (data.length > 0) {
+                    const hasOpenAIKey = data[0].openai_api_key ? 'Yes' : 'No';
+                    log('supabase-result', `🔑 OpenAI API key available: ${hasOpenAIKey}`, 'info');
+                    return data[0].openai_api_key;
+                } else {
+                    log('supabase-result', `❌ No API keys found`, 'error');
+                    return null;
+                }
+            } catch (error) {
+                log('supabase-result', `❌ Supabase test failed: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function testContentGeneration() {
+            const resultDiv = document.getElementById('generation-result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('generation-result', 'Testing content generation...', 'info');
+                
+                // First get the OpenAI API key
+                const openaiApiKey = await testSupabase();
+                if (!openaiApiKey) {
+                    log('generation-result', '❌ Cannot proceed without OpenAI API key', 'error');
+                    return;
+                }
+
+                // Mock card data for ICICI MakeMyTrip
+                const cardData = {
+                    name: 'ICICI MakeMyTrip Credit Card',
+                    bank_name: 'ICICI Bank',
+                    joining_fee: '₹500',
+                    annual_fee: '₹500',
+                    key_features: ['5X rewards on MakeMyTrip', '2X rewards on dining', '1X on other spends'],
+                    benefits: ['Complimentary airport lounge access', 'Travel insurance', 'Zero forex markup']
+                };
+
+                const systemPrompt = `You are a professional financial content creator specializing in credit card content. You create engaging, accurate, and informative content that follows best practices for social media platforms.
+
+IMPORTANT: Always respond with valid JSON format containing content for each platform.
+
+CONTEXT:
+- Selected Cards: ${cardData.name}
+- Tone: professional
+- Format: Full Post
+
+PLATFORM GUIDELINES:
+
+LINKEDIN:
+- Tone: professional
+- Max Length: 3000 characters
+- Emoji Usage: minimal
+- Hashtag Count: 3-5
+- Content Style: educational, thought-leadership, industry insights
+- Call to Action: professional
+
+CARD DATA CONTEXT:
+${cardData.name} (${cardData.bank_name}):
+- Annual Fee: ${cardData.annual_fee}
+- Joining Fee: ${cardData.joining_fee}
+- Key Features: ${cardData.key_features.join(', ')}
+- Benefits: ${cardData.benefits.join(', ')}
+
+INSTRUCTIONS:
+1. Use the card data provided to create accurate, specific content
+2. Follow platform-specific guidelines for tone, length, and style
+3. Include relevant hashtags appropriate for each platform
+4. Make content engaging and actionable
+5. Always maintain accuracy and avoid misleading information
+
+RESPONSE FORMAT:
+Return a JSON object with content for each platform:
+{
+  "linkedin": "content for LinkedIn",
+  "twitter": "content for Twitter", 
+  "instagram": "content for Instagram",
+  "youtube": "content for YouTube"
+}`;
+
+                const userPrompt = `Create content for the following request:
+
+USER REQUEST: ${config.testPrompt}
+
+PLATFORMS: LinkedIn
+FORMAT: Full Post
+
+SPECIFIC REQUIREMENTS:
+- Focus on the selected cards: ${cardData.name}
+- If the user asks about specific card features (like joining fees, rewards, etc.), use the provided card data
+- Make the content platform-appropriate and engaging
+- Include relevant hashtags and calls-to-action
+
+Please generate content that addresses the user's specific request while following all platform guidelines.`;
+
+                log('generation-result', '📝 Sending request to OpenAI...', 'info');
+
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${openaiApiKey}`,
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: systemPrompt
+                            },
+                            {
+                                role: 'user',
+                                content: userPrompt
+                            }
+                        ],
+                        max_tokens: 2000,
+                        temperature: 0.7,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                const content = data.choices[0].message.content;
+                
+                log('generation-result', '✅ Content generation successful', 'success');
+                log('generation-result', `📄 Response length: ${content.length} characters`, 'info');
+
+                // Try to parse JSON response
+                try {
+                    const parsedContent = JSON.parse(content);
+                    log('generation-result', `📄 Generated content for platforms: ${Object.keys(parsedContent).join(', ')}`, 'success');
+                    
+                    // Display the LinkedIn content
+                    if (parsedContent.linkedin) {
+                        document.getElementById('content-preview').value = parsedContent.linkedin;
+                        log('generation-result', `📱 LinkedIn content (${parsedContent.linkedin.length} chars) loaded`, 'success');
+                    }
+                    
+                    return parsedContent;
+                } catch (parseError) {
+                    log('generation-result', `❌ Failed to parse JSON: ${parseError.message}`, 'error');
+                    log('generation-result', `📄 Raw response: ${content.substring(0, 500)}...`, 'info');
+                    return null;
+                }
+
+            } catch (error) {
+                log('generation-result', `❌ Content generation failed: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function testBankKaro() {
+            const resultDiv = document.getElementById('bankkaro-result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('bankkaro-result', 'Testing BankKaro API...', 'info');
+                
+                const response = await fetch('https://bk-api.bankkaro.com/sp/api/cards', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        slug: "",
+                        banks_ids: [],
+                        card_networks: [],
+                        annualFees: "",
+                        credit_score: "",
+                        sort_by: "",
+                        free_cards: "",
+                        eligiblityPayload: {},
+                        cardGeniusPayload: {}
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const cards = Array.isArray(data) ? data : data.cards || data.data?.cards || [];
+                
+                log('bankkaro-result', '✅ BankKaro API working correctly', 'success');
+                log('bankkaro-result', `📊 Cards fetched: ${cards.length}`, 'info');
+                
+                // Search for ICICI MakeMyTrip card
+                const iciciCard = cards.find(card => 
+                    card.name?.toLowerCase().includes('icici') && 
+                    card.name?.toLowerCase().includes('makemytrip')
+                );
+                
+                if (iciciCard) {
+                    log('bankkaro-result', `🎯 Found ICICI MakeMyTrip card: ${iciciCard.name}`, 'success');
+                    log('bankkaro-result', `💰 Joining Fee: ${iciciCard.joining_fee}`, 'info');
+                    log('bankkaro-result', `💳 Annual Fee: ${iciciCard.annual_fee}`, 'info');
+                } else {
+                    log('bankkaro-result', '❌ ICICI MakeMyTrip card not found in API response', 'error');
+                }
+                
+            } catch (error) {
+                log('bankkaro-result', `❌ BankKaro API test failed: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html> 

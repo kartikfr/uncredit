@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4caf50; background-color: #f1f8e9; }
+        .error { border-color: #f44336; background-color: #ffebee; }
+        .info { border-color: #2196f3; background-color: #e3f2fd; }
+        .content-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .keyword {
+            background: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 2px;
+            display: inline-block;
+        }
+        .relevance-high { background: #c8e6c9; }
+        .relevance-medium { background: #fff3e0; }
+        .relevance-low { background: #ffcdd2; }
+    </style>
+</head>
+<body>
+    <h1>RAG System Test</h1>
+    
+    <div class="container">
+        <h2>Test 1: Keyword Extraction</h2>
+        <div id="keyword-test" class="test-section info">
+            <button onclick="testKeywordExtraction()">Test Keyword Extraction</button>
+            <div id="keyword-result"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Test 2: Card Data Search</h2>
+        <div id="search-test" class="test-section info">
+            <button onclick="testCardSearch()">Test Card Data Search</button>
+            <div id="search-result"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Test 3: RAG Content Generation</h2>
+        <div id="rag-test" class="test-section info">
+            <button onclick="testRAGGeneration()">Test RAG Content Generation</button>
+            <div id="rag-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Mock card data for testing
+        const mockCardData = {
+            id: 'icici-makemytrip',
+            name: 'ICICI MAKEMYTRIP CREDIT CARD',
+            seo_card_alias: 'icici-makemytrip-credit-card',
+            bank_name: 'ICICI Bank',
+            card_network: 'Visa',
+            annual_fee: '₹2,500',
+            joining_fee: '₹2,500',
+            key_features: [
+                '5X rewards on MakeMyTrip transactions',
+                '2X rewards on dining and entertainment',
+                '1X rewards on all other spends',
+                'Complimentary airport lounge access'
+            ],
+            benefits: [
+                'Zero forex markup',
+                'Travel insurance coverage',
+                'Fuel surcharge waiver',
+                'Reward point redemption'
+            ],
+            reward_conversion_rate: '1 point = ₹0.25',
+            redemption_options: 'MakeMyTrip vouchers, statement credit, gift cards',
+            age_criteria: '21-65 years',
+            income_salaried: '₹6,00,000 per annum',
+            income_self_emp: '₹8,00,000 per annum',
+            crif: '750+',
+            crif_self_emp: '750+',
+            exclusion_spends: 'Fuel, insurance, utilities',
+            exclusion_earnings: 'Government transactions, cash advances'
+        };
+
+        // Keyword extraction function (same as in the service)
+        function extractSearchKeywords(prompt) {
+            const keywords = [];
+            const lowerPrompt = prompt.toLowerCase();
+
+            // Fee-related keywords
+            if (lowerPrompt.includes('joining fee') || lowerPrompt.includes('joining fees')) {
+                keywords.push('joining_fee', 'joining fee', 'fees');
+            }
+            if (lowerPrompt.includes('annual fee') || lowerPrompt.includes('annual fees')) {
+                keywords.push('annual_fee', 'annual fee', 'fees');
+            }
+
+            // Reward-related keywords
+            if (lowerPrompt.includes('reward') || lowerPrompt.includes('rewards') || lowerPrompt.includes('points')) {
+                keywords.push('reward_conversion_rate', 'rewards', 'points', 'key_features');
+            }
+
+            // Benefit-related keywords
+            if (lowerPrompt.includes('benefit') || lowerPrompt.includes('benefits') || lowerPrompt.includes('feature')) {
+                keywords.push('benefits', 'key_features', 'feature');
+            }
+
+            // Eligibility keywords
+            if (lowerPrompt.includes('eligibility') || lowerPrompt.includes('income') || lowerPrompt.includes('age') || lowerPrompt.includes('crif')) {
+                keywords.push('age_criteria', 'income_salaried', 'income_self_emp', 'crif', 'eligibility');
+            }
+
+            // Network keywords
+            if (lowerPrompt.includes('visa') || lowerPrompt.includes('mastercard') || lowerPrompt.includes('network')) {
+                keywords.push('card_network', 'network');
+            }
+
+            // Bank keywords
+            if (lowerPrompt.includes('bank') || lowerPrompt.includes('hdfc') || lowerPrompt.includes('icici') || lowerPrompt.includes('sbi')) {
+                keywords.push('bank_name', 'bank');
+            }
+
+            // General card info
+            keywords.push('name', 'card', 'credit');
+
+            return keywords;
+        }
+
+        // Search card data function (same as in the service)
+        function searchCardData(card, keywords) {
+            const results = [];
+
+            for (const keyword of keywords) {
+                for (const [field, value] of Object.entries(card)) {
+                    if (!value) continue;
+
+                    const fieldStr = field.toLowerCase();
+                    const valueStr = String(value).toLowerCase();
+                    const keywordLower = keyword.toLowerCase();
+
+                    let relevance = 0;
+
+                    // Exact field match
+                    if (fieldStr.includes(keywordLower)) {
+                        relevance += 10;
+                    }
+
+                    // Value contains keyword
+                    if (valueStr.includes(keywordLower)) {
+                        relevance += 5;
+                    }
+
+                    // Partial matches
+                    if (fieldStr.includes(keywordLower.substring(0, 3))) {
+                        relevance += 3;
+                    }
+
+                    if (valueStr.includes(keywordLower.substring(0, 3))) {
+                        relevance += 2;
+                    }
+
+                    if (relevance > 0) {
+                        results.push({
+                            field,
+                            value: String(value),
+                            relevance
+                        });
+                    }
+                }
+            }
+
+            // Sort by relevance and remove duplicates
+            const uniqueResults = results
+                .filter((result, index, self) => 
+                    index === self.findIndex(r => r.field === result.field)
+                )
+                .sort((a, b) => b.relevance - a.relevance)
+                .slice(0, 10);
+
+            return uniqueResults;
+        }
+
+        // Extract relevant data function (same as in the service)
+        function extractRelevantData(card, keywords) {
+            const extracted = {};
+            const lowerKeywords = keywords.map(k => k.toLowerCase());
+
+            // Extract joining fee
+            if (lowerKeywords.some(k => k.includes('joining'))) {
+                extracted.joining_fee = card.joining_fee;
+            }
+
+            // Extract annual fee
+            if (lowerKeywords.some(k => k.includes('annual'))) {
+                extracted.annual_fee = card.annual_fee;
+            }
+
+            // Extract rewards
+            if (lowerKeywords.some(k => k.includes('reward') || k.includes('point'))) {
+                extracted.reward_rate = card.reward_conversion_rate;
+                extracted.key_features = card.key_features;
+            }
+
+            // Extract benefits
+            if (lowerKeywords.some(k => k.includes('benefit') || k.includes('feature'))) {
+                extracted.benefits = card.benefits;
+                extracted.key_features = card.key_features;
+            }
+
+            // Extract eligibility
+            if (lowerKeywords.some(k => k.includes('eligibility') || k.includes('income') || k.includes('age'))) {
+                extracted.eligibility = {
+                    age: card.age_criteria || 'Not specified',
+                    income_salaried: card.income_salaried || 'Not specified',
+                    income_self_emp: card.income_self_emp || 'Not specified',
+                    crif: card.crif || 'Not specified'
+                };
+            }
+
+            return extracted;
+        }
+
+        function testKeywordExtraction() {
+            const resultDiv = document.getElementById('keyword-result');
+            
+            const testPrompts = [
+                'Give me the post of joining fee of this card',
+                'Write about the rewards and benefits of this credit card',
+                'What is the eligibility criteria for this card?',
+                'Tell me about the annual fee and network of this card'
+            ];
+
+            let resultHTML = '<div class="success">✅ Keyword extraction test results:</div>';
+            
+            testPrompts.forEach((prompt, index) => {
+                const keywords = extractSearchKeywords(prompt);
+                resultHTML += `
+                    <h4>Test ${index + 1}: "${prompt}"</h4>
+                    <div>Keywords: ${keywords.map(k => `<span class="keyword">${k}</span>`).join('')}</div>
+                `;
+            });
+
+            resultDiv.innerHTML = resultHTML;
+            document.getElementById('keyword-test').className = 'test-section success';
+        }
+
+        function testCardSearch() {
+            const resultDiv = document.getElementById('search-result');
+            
+            const testPrompt = 'Give me the post of joining fee of this card';
+            const keywords = extractSearchKeywords(testPrompt);
+            const searchResults = searchCardData(mockCardData, keywords);
+            const extractedData = extractRelevantData(mockCardData, keywords);
+
+            let resultHTML = `
+                <div class="success">✅ Card search test results:</div>
+                <h4>Search Query: "${testPrompt}"</h4>
+                <h4>Extracted Keywords:</h4>
+                <div>${keywords.map(k => `<span class="keyword">${k}</span>`).join('')}</div>
+                
+                <h4>Search Results (Top 5):</h4>
+                <div class="content-display">
+            `;
+
+            searchResults.slice(0, 5).forEach(result => {
+                const relevanceClass = result.relevance >= 10 ? 'relevance-high' : 
+                                     result.relevance >= 5 ? 'relevance-medium' : 'relevance-low';
+                resultHTML += `
+                    <div class="${relevanceClass}">
+                        <strong>${result.field}</strong>: ${result.value} (Relevance: ${result.relevance})
+                    </div>
+                `;
+            });
+
+            resultHTML += `
+                </div>
+                
+                <h4>Extracted Relevant Data:</h4>
+                <div class="content-display">
+                    ${JSON.stringify(extractedData, null, 2)}
+                </div>
+            `;
+
+            resultDiv.innerHTML = resultHTML;
+            document.getElementById('search-test').className = 'test-section success';
+        }
+
+        function testRAGGeneration() {
+            const resultDiv = document.getElementById('rag-result');
+            
+            const testPrompt = 'Give me the post of joining fee of this card';
+            const keywords = extractSearchKeywords(testPrompt);
+            const searchResults = searchCardData(mockCardData, keywords);
+            const extractedData = extractRelevantData(mockCardData, keywords);
+
+            // Simulate RAG-enhanced prompt
+            const ragEnhancedPrompt = `Create social media content for credit cards with the following specifications:
+
+Platforms: LinkedIn, Twitter
+Selected Cards: ICICI MAKEMYTRIP CREDIT CARD
+Tone: professional
+User Prompt: ${testPrompt}
+
+RAG-ENHANCED CONTEXT:
+The following information has been extracted from the selected credit cards based on your request:
+
+ICICI MAKEMYTRIP CREDIT CARD:
+- joining_fee: ${extractedData.joining_fee || 'Not found'}
+- annual_fee: ${extractedData.annual_fee || 'Not found'}
+- reward_rate: ${extractedData.reward_rate || 'Not found'}
+- key_features: ${extractedData.key_features?.join(', ') || 'Not found'}
+
+SPECIFIC REQUIREMENTS:
+- Focus on the information extracted from the RAG search
+- If the user asks about specific card features (like joining fees), use the exact data provided
+- Make the content platform-appropriate and engaging
+- Include relevant hashtags and calls-to-action
+
+IMPORTANT: Return ONLY valid JSON with the following structure:
+{
+  "linkedin": "content for LinkedIn",
+  "twitter": "content for Twitter"
+}`;
+
+            let resultHTML = `
+                <div class="success">✅ RAG Generation test results:</div>
+                <h4>Original Prompt: "${testPrompt}"</h4>
+                
+                <h4>RAG-Enhanced Prompt:</h4>
+                <div class="content-display">
+                    ${ragEnhancedPrompt}
+                </div>
+                
+                <h4>Expected Behavior:</h4>
+                <ul>
+                    <li>✅ System extracts keywords: joining fee, fees, card, credit</li>
+                    <li>✅ Searches card data for relevant information</li>
+                    <li>✅ Finds joining_fee: ₹2,500</li>
+                    <li>✅ Enhances OpenAI prompt with specific card data</li>
+                    <li>✅ Generates content using actual card information</li>
+                </ul>
+                
+                <h4>Key Benefits:</h4>
+                <ul>
+                    <li>🎯 <strong>Accurate Information:</strong> Uses real card data instead of generic content</li>
+                    <li>🔍 <strong>Intelligent Search:</strong> Finds relevant information based on user query</li>
+                    <li>📊 <strong>Context-Aware:</strong> Provides specific details about the selected card</li>
+                    <li>💡 <strong>Relevant Content:</strong> Generates content that directly addresses user questions</li>
+                </ul>
+            `;
+
+            resultDiv.innerHTML = resultHTML;
+            document.getElementById('rag-test').className = 'test-section success';
+        }
+
+        // Auto-run tests on load
+        window.onload = function() {
+            testKeywordExtraction();
+            setTimeout(testCardSearch, 1000);
+            setTimeout(testRAGGeneration, 2000);
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,238 @@
+// Simplified API Key Management Service for Supabase
+export interface ApiKeyResponse {
+  key_value: string
+  is_active: boolean
+}
+
+export class SupabaseApiKeyService {
+  private static instance: SupabaseApiKeyService
+  private cachedKey: string | null = null
+  private cacheExpiry: number = 0
+  private readonly CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+  private supabaseUrl: string
+  private supabaseAnonKey: string
+
+  constructor() {
+    this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+    this.supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+    
+    console.log('🔧 SupabaseApiKeyService constructor:', {
+      hasUrl: !!this.supabaseUrl,
+      hasAnonKey: !!this.supabaseAnonKey,
+      url: this.supabaseUrl,
+      anonKeyPrefix: this.supabaseAnonKey ? this.supabaseAnonKey.substring(0, 20) + '...' : 'none',
+      envVars: {
+        VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Not set',
+        VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Not set',
+        VITE_OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY ? 'Set' : 'Not set'
+      }
+    });
+  }
+
+  static getInstance(): SupabaseApiKeyService {
+    if (!SupabaseApiKeyService.instance) {
+      SupabaseApiKeyService.instance = new SupabaseApiKeyService()
+    }
+    return SupabaseApiKeyService.instance
+  }
+
+  async getOpenAIKey(): Promise<string> {
+    console.log('🔑 getOpenAIKey: Starting...');
+    
+    // Check cache first
+    if (this.cachedKey && Date.now() < this.cacheExpiry) {
+      console.log('🔑 getOpenAIKey: Using cached key');
+      return this.cachedKey
+    }
+
+    // First try to get from environment variable (fallback)
+    const envKey = import.meta.env.VITE_OPENAI_API_KEY
+    if (envKey) {
+      console.log('🔑 getOpenAIKey: Using environment variable key');
+      this.cachedKey = envKey
+      this.cacheExpiry = Date.now() + this.CACHE_DURATION
+      return envKey
+    }
+
+    // If no Supabase config, return empty string
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      console.warn('❌ Supabase configuration not found. Using environment variable or mock content.')
+      console.log('🔍 Supabase config check:', {
+        hasUrl: !!this.supabaseUrl,
+        hasAnonKey: !!this.supabaseAnonKey,
+        url: this.supabaseUrl,
+        anonKeyPrefix: this.supabaseAnonKey ? this.supabaseAnonKey.substring(0, 20) + '...' : 'none'
+      });
+      return ''
+    }
+
+    console.log('🔑 getOpenAIKey: Fetching from Supabase...');
+    console.log('🔍 Supabase config:', {
+      url: this.supabaseUrl,
+      anonKeyPrefix: this.supabaseAnonKey.substring(0, 20) + '...'
+    });
+
+    try {
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/api_keys?key_name=eq.openai_api_key&is_active=eq.true&select=key_value,is_active`, {
+        method: 'GET',
+        headers: {
+          'apikey': this.supabaseAnonKey,
+          'Authorization': `Bearer ${this.supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      console.log('📡 Supabase API response status:', response.status);
+
+      if (!response.ok) {
+        console.warn('❌ Failed to fetch API key from Supabase. Using environment variable or mock content.')
+        const errorText = await response.text();
+        console.error('❌ Supabase error response:', errorText);
+        return ''
+      }
+
+      const data = await response.json()
+      console.log('📋 Supabase API response data:', {
+        dataType: typeof data,
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 'not array',
+        hasData: !!data,
+        firstItem: Array.isArray(data) && data.length > 0 ? {
+          hasKeyValue: !!data[0].key_value,
+          keyValueLength: data[0].key_value ? data[0].key_value.length : 0,
+          isActive: data[0].is_active
+        } : 'no items'
+      });
+      
+      if (!data || data.length === 0 || !data[0].key_value) {
+        console.warn('❌ No API key found in Supabase. Using environment variable or mock content.')
+        return ''
+      }
+
+      // Cache the key
+      this.cachedKey = data[0].key_value
+      this.cacheExpiry = Date.now() + this.CACHE_DURATION
+
+      console.log('✅ getOpenAIKey: Successfully retrieved and cached API key');
+      return data[0].key_value
+    } catch (error) {
+      console.error('❌ Error fetching API key from Supabase:', error)
+      return ''
+    }
+  }
+
+  async setOpenAIKey(keyValue: string, description?: string): Promise<void> {
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      console.warn('Supabase configuration not found. Cannot save API key.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/api_keys`, {
+        method: 'POST',
+        headers: {
+          'apikey': this.supabaseAnonKey,
+          'Authorization': `Bearer ${this.supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key_name: 'openai_api_key',
+          key_value: keyValue,
+          description: description || 'OpenAI API key for content generation',
+          is_active: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save API key')
+      }
+
+      // Clear cache to force refresh
+      this.cachedKey = null
+      this.cacheExpiry = 0
+    } catch (error) {
+      console.error('Error setting API key:', error)
+      throw error
+    }
+  }
+
+  async updateOpenAIKey(keyValue: string, description?: string): Promise<void> {
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      console.warn('Supabase configuration not found. Cannot update API key.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/api_keys?key_name=eq.openai_api_key`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': this.supabaseAnonKey,
+          'Authorization': `Bearer ${this.supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key_value: keyValue,
+          description: description || 'OpenAI API key for content generation',
+          is_active: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update API key')
+      }
+
+      // Clear cache to force refresh
+      this.cachedKey = null
+      this.cacheExpiry = 0
+    } catch (error) {
+      console.error('Error updating API key:', error)
+      throw error
+    }
+  }
+
+  async deleteOpenAIKey(): Promise<void> {
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      console.warn('Supabase configuration not found. Cannot delete API key.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/api_keys?key_name=eq.openai_api_key`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': this.supabaseAnonKey,
+          'Authorization': `Bearer ${this.supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          is_active: false
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete API key')
+      }
+
+      // Clear cache
+      this.cachedKey = null
+      this.cacheExpiry = 0
+    } catch (error) {
+      console.error('Error deleting API key:', error)
+      throw error
+    }
+  }
+
+  // Clear cache manually if needed
+  clearCache(): void {
+    this.cachedKey = null
+    this.cacheExpiry = 0
+  }
+
+  // Check if Supabase is configured
+  isSupabaseConfigured(): boolean {
+    return !!(this.supabaseUrl && this.supabaseAnonKey)
+  }
+}
+
+export const supabaseApiKeyService = SupabaseApiKeyService.getInstance() 
