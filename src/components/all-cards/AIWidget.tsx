@@ -119,51 +119,39 @@ Tags: ${Array.isArray(card.tags) ? card.tags.join(', ') : 'N/A'}
     }
   };
 
-  // Real OpenAI API integration with dual API search
+  // Secure OpenAI API integration via Supabase Edge Function
   const callOpenAI = async (message: string, cardContext: string, cardName: string): Promise<string> => {
     try {
       // First, get additional data from Card Genius API using seo_card_alias
       const cardGeniusData = await getCardGeniusData(selectedCard.seo_card_alias);
       
-      // Combine both API data for comprehensive context
-      const enhancedContext = `${cardContext}\n\nAdditional Card Genius Data:\n${cardGeniusData}`;
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Call Supabase Edge Function instead of OpenAI directly
+      const response = await fetch('https://yurfpubenqaotwnemuwg.supabase.co/functions/v1/ai-chat', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer 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`,
           'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1cmZwdWJlbnFhb3R3bmVtdXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwNTY2MDYsImV4cCI6MjA2NzYzMjYwNn0.0YY2TikwGgBJC7FsubXGB28uEoCLv40UaZiAxG4UxyQ`,
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a helpful AI assistant for credit card information. You have access to detailed information from both BankKaro API and Card Genius API about a specific credit card. Always provide accurate, helpful responses based on the comprehensive card data provided. Be conversational but professional. Focus on the specific card information given and provide clear, concise answers. If information is available from both sources, prioritize the most detailed or recent information.`
-            },
-            {
-              role: 'user',
-              content: `Comprehensive Card Information:\n${enhancedContext}\n\nUser Question: ${message}\n\nPlease provide a helpful response about the ${cardName} based on all the information provided from both APIs.`
-            }
-          ],
-          max_tokens: 600,
-          temperature: 0.7,
+          message,
+          cardContext,
+          cardName,
+          cardGeniusData
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        throw new Error(`Supabase Edge Function error: ${response.status}`);
       }
 
       const data = await response.json();
-      return data.choices[0].message.content;
+      return data.response;
     } catch (error) {
-      console.error('OpenAI API error:', error);
-      // Fallback to mock response if OpenAI fails
+      console.error('Supabase Edge Function error:', error);
+      // Fallback to mock response if Supabase fails
       return generateMockAIResponse(message, cardContext, cardName);
     }
-  };
-
+  };  
   // Get additional data from Card Genius API
   const getCardGeniusData = async (seoCardAlias: string | undefined): Promise<string> => {
     if (!seoCardAlias) {

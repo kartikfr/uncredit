@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Explore from "./pages/Explore";
 import AllCards from "./pages/AllCards";
 import CardDetail from "./pages/CardDetail";
+import CardSavingsDetail from "./pages/CardSavingsDetail";
 import Calculator from "./pages/Calculator";
 import CardGenius from "./pages/CardGenius";
 import Compare from "./pages/Compare";
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/explore" element={<Explore />} />
           <Route path="/all-cards" element={<AllCards />} />
           <Route path="/card/:id" element={<CardDetail />} />
+          <Route path="/card-savings-detail/:cardAlias" element={<CardSavingsDetail />} />
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/genius" element={<CardGenius />} />
           <Route path="/compare" element={<Compare />} />

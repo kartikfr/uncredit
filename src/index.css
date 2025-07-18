@@ -450,6 +450,48 @@ All colors MUST be HSL.
   animation: gradient-shift 3s ease infinite;
 }
 
+/* Savings Calculator Animations */
+.animate-savings-float {
+  animation: savings-float 2s ease-in-out infinite;
+}
+
+.animate-category-pulse {
+  animation: category-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-result-glow {
+  animation: result-glow 2s ease-in-out infinite;
+}
+
+@keyframes savings-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes category-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 16px hsl(var(--primary-blue) / 0.12);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px hsl(var(--primary-blue) / 0.2);
+  }
+}
+
+@keyframes result-glow {
+  0%, 100% {
+    box-shadow: 0 4px 16px hsl(var(--success) / 0.2);
+  }
+  50% {
+    box-shadow: 0 8px 32px hsl(var(--success) / 0.4);
+  }
+}
+
 /* Enhanced Hover Effects */
 .hover-card-lift {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -480,4 +522,54 @@ All colors MUST be HSL.
   background: rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced Calculator Animations */
+.animate-calculator-success {
+  animation: calculator-success 0.6s ease-out;
+}
+
+.animate-category-select {
+  animation: category-select 0.3s ease-out;
+}
+
+.animate-smooth-scroll {
+  animation: smooth-scroll 0.8s ease-out;
+}
+
+@keyframes calculator-success {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes category-select {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes smooth-scroll {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
