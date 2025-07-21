@@ -120,8 +120,8 @@ class ApiError extends Error {
 }
 
 class CardService {
-  private baseURL = 'https://bk-api.bankkaro.com/sp/api';
-  private cardRecommendationURL = 'https://card-recommendation-api-v2.bankkaro.com/cg/api/pro';
+  private baseURL = '/api'; // Use proxy instead of direct external API
+  private cardRecommendationURL = '/cg-api/pro'; // Use proxy instead of direct external API
 
   private async makeRequest(url: string, options: RequestInit = {}): Promise<any> {
     console.log('API Service: Making request to:', url);
@@ -295,15 +295,93 @@ class CardService {
   }
 
   async getCardRecommendations(spendingData: any): Promise<any> {
-    const payload = {
-      ...spendingData,
-      selected_card_id: null
-    };
+    console.log('API Service: Getting card recommendations with spending data:', spendingData);
+    
+    try {
+      const data = await this.makeRequest(this.cardRecommendationURL, {
+        method: 'POST',
+        body: JSON.stringify(spendingData),
+      });
 
-    return await this.makeRequest(this.cardRecommendationURL, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+      console.log('API Service: Card recommendations response:', data);
+      return data;
+    } catch (error) {
+      console.error('API Service: Error getting card recommendations:', error);
+      throw error;
+    }
+  }
+
+  async getCardGeniusDataForCard(seoCardAlias: string, spendingData?: any): Promise<any> {
+    console.log('API Service: Getting Card Genius data for card:', seoCardAlias);
+    
+    try {
+      // Use default spending data if not provided
+      const defaultSpendingData = {
+        amazon_spends: 1280,
+        flipkart_spends: 10000,
+        grocery_spends_online: 7500,
+        online_food_ordering: 5000,
+        other_online_spends: 3000,
+        other_offline_spends: 5000,
+        dining_or_going_out: 5000,
+        fuel: 5000,
+        school_fees: 20000,
+        rent: 35000,
+        mobile_phone_bills: 1500,
+        electricity_bills: 7500,
+        water_bills: 2500,
+        ott_channels: 1000,
+        new_monthly_cat_1: 0,
+        new_monthly_cat_2: 0,
+        new_monthly_cat_3: 0,
+        hotels_annual: 75000,
+        flights_annual: 75000,
+        insurance_health_annual: 75000,
+        insurance_car_or_bike_annual: 45000,
+        large_electronics_purchase_like_mobile_tv_etc: 100000,
+        all_pharmacy: 99,
+        new_cat_1: 0,
+        new_cat_2: 0,
+        new_cat_3: 0,
+        domestic_lounge_usage_quarterly: 20,
+        international_lounge_usage_quarterly: 13,
+        railway_lounge_usage_quarterly: 1,
+        movie_usage: 3,
+        movie_mov: 600,
+        dining_usage: 3,
+        dining_mov: 1500,
+        selected_card_id: null
+      };
+
+      const payload = spendingData || defaultSpendingData;
+      
+      const data = await this.makeRequest(this.cardRecommendationURL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      console.log('API Service: Card Genius data response:', data);
+      
+      // Find the specific card by seo_card_alias
+      if (data.savings && Array.isArray(data.savings)) {
+        const cardData = data.savings.find((card: any) => 
+          card.seo_card_alias === seoCardAlias
+        );
+        
+        if (cardData) {
+          console.log('API Service: Found card data:', cardData);
+          return cardData;
+        } else {
+          console.warn('API Service: Card not found in Card Genius data:', seoCardAlias);
+          return null;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('API Service: Error getting Card Genius data for card:', error);
+      throw error;
+    }
   }
 
   async getFilteredCardsFromCardGenius(filters: CardFilters): Promise<string[]> {

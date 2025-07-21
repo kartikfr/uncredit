@@ -47,6 +47,8 @@ import {
 import { Card as CardType } from "@/services/api";
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, Title, DonutChart } from '@tremor/react';
+import { RedemptionOptions } from "@/components/redemption/RedemptionOptions";
+import PDFDownloadButton from '@/components/pdf/PDFDownloadButton';
 
 // Enhanced category mapping with proper icons and display names
 const SPENDING_CATEGORY_MAPPING = {
@@ -250,6 +252,9 @@ interface CategoryBreakdown {
   cashback_percentage?: string;
   maxCap?: number;
   totalMaxCap?: number;
+  points_earned?: number;
+  conv_rate?: string;
+  spend?: number;
 }
 
 interface SavingsBreakdown {
@@ -273,6 +278,7 @@ const CardSavingsDetail = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
   const [savingsBreakdown, setSavingsBreakdown] = useState<SavingsBreakdown[]>([]);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'top5' | 'significant'>('all');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -328,7 +334,10 @@ const CardSavingsDetail = () => {
             explanation: item.explanation || [],
             cashback_percentage: item.cashback_percentage,
             maxCap: item.maxCap,
-            totalMaxCap: item.totalMaxCap
+            totalMaxCap: item.totalMaxCap,
+            points_earned: item.points_earned,
+            conv_rate: item.conv_rate,
+            spend: item.spend
           });
         }
       });
@@ -404,20 +413,53 @@ const CardSavingsDetail = () => {
 
   // Prepare data for charts
   const getPieChartData = () => {
-    return categoryBreakdown.map(item => ({
+    // Filter out categories with zero savings and sort by savings amount
+    const validCategories = categoryBreakdown
+      .filter(item => item.savings > 0)
+      .sort((a, b) => b.savings - a.savings);
+
+    // If we have more than 6 categories, group the smallest ones into "Others"
+    if (validCategories.length > 6) {
+      const topCategories = validCategories.slice(0, 5);
+      const otherCategories = validCategories.slice(5);
+      const othersTotal = otherCategories.reduce((sum, item) => sum + item.savings, 0);
+      
+      return [
+        ...topCategories.map(item => ({
+          name: item.displayName,
+          value: item.savings,
+          color: item.chartColor,
+          fullName: item.displayName
+        })),
+        {
+          name: "Others",
+          value: othersTotal,
+          color: "#6B7280", // Gray color for others
+          fullName: `Others (${otherCategories.length} categories)`
+        }
+      ];
+    }
+
+    // Return all categories if 6 or fewer
+    return validCategories.map(item => ({
       name: item.displayName,
       value: item.savings,
-      color: item.chartColor
+      color: item.chartColor,
+      fullName: item.displayName
     }));
   };
 
   const getBarChartData = () => {
-    return categoryBreakdown.map(item => ({
-      category: item.displayName,
-      "Amount Spent": item.userAmount,
-      "Savings": item.savings,
-      "Cashback Rate": parseFloat(item.cashback_percentage || "0")
-    }));
+    // Filter out categories with zero savings for better bar chart display
+    return categoryBreakdown
+      .filter(item => item.savings > 0)
+      .sort((a, b) => b.savings - a.savings)
+      .map(item => ({
+        category: item.displayName,
+        "Amount Spent": item.userAmount,
+        "Savings": item.savings,
+        "Cashback Rate": parseFloat(item.cashback_percentage || "0")
+      }));
   };
 
   if (!card || !calcResult) {
@@ -463,15 +505,28 @@ const CardSavingsDetail = () => {
                 <p className="text-sm text-muted-foreground">{card.name}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium text-primary">Card Genius</span>
+            <div className="flex items-center space-x-4">
+              <PDFDownloadButton
+                cardName={card.name}
+                totalSavings={Number(calcResult.total_savings_yearly)}
+                joiningFees={Number(calcResult.joining_fees)}
+                netSavings={netSavings}
+                categoryBreakdown={categoryBreakdown}
+                savingsBreakdown={savingsBreakdown}
+                calcValues={calcValues}
+                calcResult={calcResult}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              />
+              <div className="flex items-center space-x-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-primary">Card Genius</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div id="card-savings-detail-content" className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <div className="mb-8">
           <UICard className="shadow-lg border-0 bg-gradient-to-r from-primary/5 to-primary/10">
@@ -533,12 +588,20 @@ const CardSavingsDetail = () => {
               {/* Pie Chart - Savings Distribution */}
               <UICard className="shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-xl flex items-center">
-                    <PieChart className="h-6 w-6 mr-3 text-primary" />
-                    Savings Distribution
+                  <CardTitle className="text-xl flex items-center justify-between">
+                    <div className="flex items-center">
+                      <PieChart className="h-6 w-6 mr-3 text-primary" />
+                      Savings Distribution
+                    </div>
+                    {pieChartData.length > 6 && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                        Top 5 + Others
+                      </Badge>
+                    )}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     How your savings are distributed across categories
+                    {pieChartData.length > 6 && " (showing top 5 categories, others grouped)"}
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -550,19 +613,52 @@ const CardSavingsDetail = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={80}
+                          label={({ name, percent, value }) => {
+                            // Only show labels for segments with > 5% or if it's "Others"
+                            if (percent > 0.05 || name === "Others") {
+                              return `${name}\n${(percent * 100).toFixed(0)}%`;
+                            }
+                            return "";
+                          }}
+                          outerRadius={pieChartData.length > 4 ? 70 : 80}
+                          innerRadius={pieChartData.length > 4 ? 20 : 0}
                           fill="#8884d8"
                           dataKey="value"
+                          paddingAngle={2}
                         >
                           {pieChartData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Savings']} />
-                        <Legend />
+                        <Tooltip 
+                          formatter={(value, name, props) => [
+                            `₹${value.toLocaleString()}`, 
+                            props.payload.fullName || name
+                          ]}
+                          labelFormatter={(label) => `Category: ${label}`}
+                        />
+                        <Legend 
+                          layout="vertical" 
+                          verticalAlign="middle" 
+                          align="right"
+                          wrapperStyle={{ fontSize: '12px' }}
+                        />
                       </RechartsPieChart>
                     </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Summary Stats */}
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                    <div className="text-center p-2 bg-gray-50 rounded">
+                      <div className="font-semibold text-gray-700">{pieChartData.length}</div>
+                      <div className="text-gray-500">Categories</div>
+                    </div>
+                    <div className="text-center p-2 bg-gray-50 rounded">
+                      <div className="font-semibold text-gray-700">
+                        ₹{pieChartData.reduce((sum, item) => sum + item.value, 0).toLocaleString()}
+                      </div>
+                      <div className="text-gray-500">Total Savings</div>
+                    </div>
                   </div>
                 </CardContent>
               </UICard>
@@ -570,27 +666,79 @@ const CardSavingsDetail = () => {
               {/* Bar Chart - Spending vs Savings */}
               <UICard className="shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-xl flex items-center">
-                    <BarChart3 className="h-6 w-6 mr-3 text-primary" />
-                    Spending vs Savings
+                  <CardTitle className="text-xl flex items-center justify-between">
+                    <div className="flex items-center">
+                      <BarChart3 className="h-6 w-6 mr-3 text-primary" />
+                      Spending vs Savings
+                    </div>
+                    {barChartData.length > 8 && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">
+                        Top {Math.min(8, barChartData.length)} Categories
+                      </Badge>
+                    )}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Compare your spending with potential savings
+                    {barChartData.length > 8 && ` (showing top ${Math.min(8, barChartData.length)} categories)`}
                   </p>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={barChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="category" />
-                        <YAxis />
-                        <Tooltip formatter={(value, name) => [`₹${value.toLocaleString()}`, name]} />
-                        <Legend />
-                        <Bar dataKey="Amount Spent" fill="#3B82F6" />
-                        <Bar dataKey="Savings" fill="#10B981" />
+                      <BarChart 
+                        data={barChartData.slice(0, 8)} 
+                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="category" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          fontSize={12}
+                        />
+                        <YAxis fontSize={12} />
+                        <Tooltip 
+                          formatter={(value, name) => [`₹${value.toLocaleString()}`, name]}
+                          labelStyle={{ fontWeight: 'bold' }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                        <Bar 
+                          dataKey="Amount Spent" 
+                          fill="#3B82F6" 
+                          radius={[4, 4, 0, 0]}
+                          name="Amount Spent"
+                        />
+                        <Bar 
+                          dataKey="Savings" 
+                          fill="#10B981" 
+                          radius={[4, 4, 0, 0]}
+                          name="Potential Savings"
+                        />
                       </BarChart>
                     </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Bar Chart Summary */}
+                  <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                    <div className="text-center p-2 bg-blue-50 rounded">
+                      <div className="font-semibold text-blue-700">
+                        ₹{barChartData.slice(0, 8).reduce((sum, item) => sum + item["Amount Spent"], 0).toLocaleString()}
+                      </div>
+                      <div className="text-blue-600">Total Spent</div>
+                    </div>
+                    <div className="text-center p-2 bg-green-50 rounded">
+                      <div className="font-semibold text-green-700">
+                        ₹{barChartData.slice(0, 8).reduce((sum, item) => sum + item["Savings"], 0).toLocaleString()}
+                      </div>
+                      <div className="text-green-600">Total Savings</div>
+                    </div>
+                    <div className="text-center p-2 bg-purple-50 rounded">
+                      <div className="font-semibold text-purple-700">
+                        {barChartData.length > 8 ? `${barChartData.length - 8} more` : 'All shown'}
+                      </div>
+                      <div className="text-purple-600">Categories</div>
+                    </div>
                   </div>
                 </CardContent>
               </UICard>
@@ -612,8 +760,46 @@ const CardSavingsDetail = () => {
                 </p>
               </CardHeader>
               <CardContent>
+                {/* Category Filter Tabs */}
+                {categoryBreakdown.length > 6 && (
+                  <div className="mb-6">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge 
+                        variant="default" 
+                        className="cursor-pointer"
+                        onClick={() => setActiveCategoryFilter('all')}
+                      >
+                        All Categories ({categoryBreakdown.length})
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer"
+                        onClick={() => setActiveCategoryFilter('top5')}
+                      >
+                        Top 5 Categories
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer"
+                        onClick={() => setActiveCategoryFilter('significant')}
+                      >
+                        Significant Savings (&gt;5%)
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {categoryBreakdown.map((item, index) => {
+                  {categoryBreakdown
+                    .filter(item => {
+                      if (activeCategoryFilter === 'top5') {
+                        return categoryBreakdown.indexOf(item) < 5;
+                      } else if (activeCategoryFilter === 'significant') {
+                        return item.percentage > 5;
+                      }
+                      return true;
+                    })
+                    .map((item, index) => {
                     const IconComponent = item.icon;
                     return (
                       <div key={index} className="bg-white rounded-lg p-6 border border-gray-200 hover:shadow-md transition-shadow">
@@ -668,6 +854,82 @@ const CardSavingsDetail = () => {
                             )}
                           </div>
                         )}
+
+                        {/* Calculation Breakdown */}
+                        <div className="bg-purple-50 rounded-lg p-4 mb-3 border border-purple-200">
+                          <div className="flex items-center space-x-2 mb-3">
+                            <Calculator className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm font-semibold text-purple-800">Savings Calculation Breakdown</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            {/* Points Earned */}
+                            <div className="bg-white rounded-lg p-3 border border-purple-100">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-purple-700 font-medium">Points Earned:</span>
+                                <Star className="h-4 w-4 text-yellow-500" />
+                              </div>
+                              <div className="text-lg font-bold text-purple-800">
+                                {(item.points_earned || Math.round(item.userAmount * (parseFloat(item.cashback_percentage || '0') / 100))).toLocaleString()} R.P
+                              </div>
+                              <div className="text-xs text-purple-600">
+                                Monthly reward points
+                              </div>
+                            </div>
+
+                            {/* Conversion Rate */}
+                            <div className="bg-white rounded-lg p-3 border border-purple-100">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-purple-700 font-medium">Conversion Rate:</span>
+                                <TrendingUp className="h-4 w-4 text-green-500" />
+                              </div>
+                              <div className="text-lg font-bold text-purple-800">
+                                {item.conv_rate ? `1 R.P = ₹${item.conv_rate}` : '1 R.P = ₹1.00'}
+                              </div>
+                              <div className="text-xs text-purple-600">
+                                {item.conv_rate ? 'API rate' : 'Standard rate'}
+                              </div>
+                            </div>
+
+                            {/* Monthly Savings */}
+                            <div className="bg-white rounded-lg p-3 border border-purple-100">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-purple-700 font-medium">Monthly Savings:</span>
+                                <PiggyBank className="h-4 w-4 text-green-500" />
+                              </div>
+                              <div className="text-lg font-bold text-purple-800">
+                                ₹{item.savings.toLocaleString()}
+                              </div>
+                              <div className="text-xs text-purple-600">
+                                Points × Conversion Rate
+                              </div>
+                            </div>
+
+                            {/* Annual Savings */}
+                            <div className="bg-white rounded-lg p-3 border border-purple-100">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-purple-700 font-medium">Annual Savings:</span>
+                                <Target className="h-4 w-4 text-blue-500" />
+                              </div>
+                              <div className="text-lg font-bold text-purple-800">
+                                ₹{(item.savings * 12).toLocaleString()}
+                              </div>
+                              <div className="text-xs text-purple-600">
+                                Monthly × 12 months
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Calculation Formula */}
+                          <div className="mt-3 p-3 bg-white rounded-lg border border-purple-100">
+                            <div className="text-xs text-purple-700 font-medium mb-1">Calculation Formula:</div>
+                            <div className="text-xs text-purple-600">
+                              <span className="font-mono">
+                                ₹{(item.spend || item.userAmount).toLocaleString()} × {item.cashback_percentage}% = {(item.points_earned || Math.round(item.userAmount * (parseFloat(item.cashback_percentage || '0') / 100))).toLocaleString()} R.P × ₹{(item.conv_rate || '1.00')} = ₹{item.savings.toLocaleString()} monthly
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
                         {/* Explanation */}
                         {item.explanation && item.explanation.length > 0 && (
@@ -757,6 +1019,49 @@ const CardSavingsDetail = () => {
             </UICard>
           </div>
         )}
+
+        {/* Redemption Options Section */}
+        <div className="mb-8">
+          <UICard className="shadow-lg border-l-4 border-purple-500">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100">
+              <CardTitle className="text-xl flex items-center justify-between">
+                <div className="flex items-center">
+                  <Award className="h-6 w-6 mr-3 text-purple-600" />
+                  Redemption Options
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                    Card Genius Data
+                  </Badge>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    Based on Your Spending
+                  </Badge>
+                </div>
+              </CardTitle>
+              <p className="text-sm text-purple-700">
+                Explore how you can redeem your calculated savings of ₹{Number(calcResult.total_savings_yearly).toLocaleString()} 
+                with {calcResult.card_name} - powered by Card Genius API
+              </p>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-blue-900">Savings Summary</span>
+                </div>
+                <p className="text-sm text-blue-700">
+                  With your current spending pattern, you can earn ₹{Number(calcResult.total_savings_yearly).toLocaleString()} 
+                  annually with {calcResult.card_name}. Below are the redemption options available for these rewards.
+                </p>
+              </div>
+              <RedemptionOptions 
+                cardName={calcResult.card_name}
+                seoCardAlias={calcResult.seo_card_alias || ''}
+                userSpending={calcValues}
+              />
+            </CardContent>
+          </UICard>
+        </div>
 
         {/* Comparison Table */}
         <div className="mb-8">

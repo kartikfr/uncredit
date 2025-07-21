@@ -61,7 +61,7 @@
 | **Display Label** | **API Tag** | **Search Location** | **Example** |
 |-------------------|-------------|-------------------|-------------|
 | **Net Annual Savings** | `roi` | `product_usps` array | "Net Annual Savings: ₹17,500" |
-| **Total Annual Savings** | `max_potential_savings` | `max_potential_savings` array | "Total Annual Savings: ₹18,000" |
+| **Total Annual Savings** | `total_savings_yearly` | `total_savings_yearly` array | "Total Annual Savings: ₹18,000" |
 | **Joining Fees** | `joining_fees` | `joining_fees` array | "Joining Fees: ₹500" |
 
 #### **Category Breakdown (from `spending_breakdown_array`)**
@@ -95,7 +95,7 @@
 - **Display**: Large prominent number with "Net Annual Savings" label
 
 #### **2. Total Annual Savings**
-- **Source**: Extract from `max_potential_savings` tag
+- **Source**: Extract from `total_savings_yearly` tag
 - **Display**: Secondary value with "Total Annual Savings" label
 
 #### **3. Joining Fees**

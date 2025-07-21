@@ -48,45 +48,37 @@ const Calculator = () => {
   const fetchBankKaroCards = async () => {
     try {
       console.log('Fetching cards from BankKaro API...');
-      const response = await fetch('https://bk-api.bankkaro.com/sp/api/cards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          slug: "",
-          banks_ids: [],
-          card_networks: [],
-          annualFees: "",
-          credit_score: "",
-          sort_by: "",
-          free_cards: "",
-          eligiblityPayload: {},
-          cardGeniusPayload: {}
-        })
+      const cards = await cardService.getCards({
+        slug: "",
+        banks_ids: [],
+        card_networks: [],
+        annualFees: "",
+        credit_score: "",
+        sort_by: "",
+        free_cards: "",
+        eligiblityPayload: {},
+        cardGeniusPayload: {}
       });
 
-      if (!response.ok) {
-        throw new Error(`BankKaro API error: ${response.status}`);
-      }
+      console.log('BankKaro API response:', cards);
 
-      const data = await response.json();
-      console.log('BankKaro API response:', data);
-
-      // Extract cards from response
-      let cards: BankKaroCard[] = [];
-      if (Array.isArray(data)) {
-        cards = data;
-      } else if (data.cards && Array.isArray(data.cards)) {
-        cards = data.cards;
-      } else if (data.data && data.data.cards && Array.isArray(data.data.cards)) {
-        cards = data.data.cards;
+      // Extract cards from response and convert to BankKaroCard type
+      let bankKaroCards: BankKaroCard[] = [];
+      if (Array.isArray(cards)) {
+        bankKaroCards = cards.map(card => ({
+          id: card.id,
+          name: card.name,
+          seo_card_alias: card.seo_card_alias || '',
+          image: card.image,
+          bank_name: card.bank_name,
+          card_type: card.card_type
+        }));
       }
 
       // If no cards found, use mock data for testing
-      if (cards.length === 0) {
+      if (bankKaroCards.length === 0) {
         console.log('No cards from API, using mock data');
-        cards = [
+        bankKaroCards = [
           {
             id: '1',
             name: 'HDFC Regalia Credit Card',
@@ -114,8 +106,8 @@ const Calculator = () => {
         ];
       }
 
-      setBankKaroCards(cards);
-      console.log('BankKaro cards loaded:', cards.length);
+      setBankKaroCards(bankKaroCards);
+      console.log('BankKaro cards loaded:', bankKaroCards.length);
       setError(''); // Clear any previous errors
     } catch (error) {
       console.error('Error fetching BankKaro cards:', error);
@@ -155,7 +147,7 @@ const Calculator = () => {
   const fetchCardGeniusCards = async () => {
     try {
       console.log('Fetching cards from Card Genius API...');
-      const response = await fetch('https://card-recommendation-api-v2.bankkaro.com/cg/api/pro', {
+      const response = await fetch('/cg-api/pro', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

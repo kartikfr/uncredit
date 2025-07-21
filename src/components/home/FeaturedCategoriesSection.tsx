@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingBag, Plane, UtensilsCrossed, Fuel, ShoppingCart, Zap, Hotel, Star, Users, CreditCard, TrendingUp, Award, Crown, CheckCircle, Sparkles, Target, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { cardService } from "@/services/api";
 
 const CATEGORY_ICONS = {
   Shopping: ShoppingBag,
@@ -189,22 +190,20 @@ export const FeaturedCategoriesSection = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch('https://bk-api.bankkaro.com/sp/api/cards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: "", banks_ids: [], card_networks: [], annualFees: "", credit_score: "", sort_by: "", free_cards: "", eligiblityPayload: {}, cardGeniusPayload: {} })
+      console.log('[FeaturedCategoriesSection] Fetching cards using cardService...');
+      const cards = await cardService.getCards({
+        slug: "",
+        banks_ids: [],
+        card_networks: [],
+        annualFees: "",
+        credit_score: "",
+        sort_by: "",
+        free_cards: "",
+        eligiblityPayload: {},
+        cardGeniusPayload: {}
       });
-      const data = await response.json();
-      console.log('[FeaturedCategoriesSection] Full API response:', data);
-      // Try all possible response structures
-      let cards: any[] = [];
-      if (Array.isArray(data)) {
-        cards = data;
-      } else if (data.cards && Array.isArray(data.cards)) {
-        cards = data.cards;
-      } else if (data.data && data.data.cards && Array.isArray(data.data.cards)) {
-        cards = data.data.cards;
-      }
+      
+      console.log('[FeaturedCategoriesSection] Cards received from service:', cards);
       
       // Debug: Log the structure of first few cards
       if (cards.length > 0) {
@@ -218,25 +217,31 @@ export const FeaturedCategoriesSection = () => {
           console.log('[FeaturedCategoriesSection] First card tags:', cards[0].tags);
         }
       }
+      
       // If no cards found, use demo data
       if (!cards || cards.length === 0) {
         console.warn('[FeaturedCategoriesSection] No cards from API, using demo data');
-        cards = DEMO_CARDS;
+        setAllCards(DEMO_CARDS);
         setError("Showing demo cards. Live data not available.");
+      } else {
+        setAllCards(cards);
+        setError(""); // Clear any previous errors
       }
-      setAllCards(cards);
       
       // Cache cards in localStorage for CardDetail component
       try {
-        localStorage.setItem("all_cards_cache", JSON.stringify(cards));
-        console.log('[FeaturedCategoriesSection] Cached', cards.length, 'cards in localStorage');
+        localStorage.setItem("all_cards_cache", JSON.stringify(cards || DEMO_CARDS));
+        console.log('[FeaturedCategoriesSection] Cached', (cards || DEMO_CARDS).length, 'cards in localStorage');
       } catch (error) {
         console.warn('[FeaturedCategoriesSection] Failed to cache cards in localStorage:', error);
       }
+      
       // Extract unique categories from tags
       const catSet = new Set<string>();
       const catMap: Record<string, any[]> = {};
-      cards.forEach(card => {
+      const cardsToProcess = cards || DEMO_CARDS;
+      
+      cardsToProcess.forEach(card => {
         if (Array.isArray(card.tags)) {
           card.tags.forEach((tag: any) => {
             // Handle both string and object tags
@@ -252,10 +257,11 @@ export const FeaturedCategoriesSection = () => {
       setCategories(catArr);
       setCategoryMap(catMap);
       setSelectedCategory(catArr[0] || "");
-      if (cards.length === 0 || catArr.length === 0) {
+      if (cardsToProcess.length === 0 || catArr.length === 0) {
         setError("No categories or cards found. Please try again later.");
       }
     } catch (error) {
+      console.error('[FeaturedCategoriesSection] Error fetching cards:', error);
       setAllCards(DEMO_CARDS);
       
       // Cache demo cards in localStorage for CardDetail component

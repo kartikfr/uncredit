@@ -279,8 +279,7 @@ const AllCards = () => {
         // Search in annual fee text
         if (card.annual_fee_text?.toLowerCase().includes(query)) return true;
         
-        // Search in commission
-        if (card.commission?.toLowerCase().includes(query)) return true;
+
         
         // Search in age criteria
         if (card.age_criteria?.toLowerCase().includes(query)) return true;

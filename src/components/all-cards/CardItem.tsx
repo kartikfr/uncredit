@@ -83,13 +83,6 @@ const CardItem: React.FC<CardItemProps> = ({
                 ) : null}
                 <CreditCard className={`h-6 w-6 text-white ${card.image ? 'hidden' : ''}`} />
               </div>
-              
-              {/* Commission Badge */}
-              {card.commission && (
-                <Badge className="absolute -top-2 -right-2 bg-accent text-white text-xs px-1 py-0">
-                  {card.commission}
-                </Badge>
-              )}
 
               {/* Compare Button Overlay */}
               <button

@@ -153,7 +153,7 @@ const SPENDING_CATEGORY_MAPPING = {
 // API Response structure mapping
 const API_RESPONSE_MAPPING = {
   spending_breakdown_array: "spending_breakdown_array",
-  total_savings_yearly: "max_potential_savings",
+  total_savings_yearly: "total_savings_yearly",
   joining_fees: "joining_fees",
   net_savings: "roi",
   category_savings: "category_savings"
@@ -292,7 +292,7 @@ function verifyApiResponseProcessing(apiResponse, userInputs) {
   const processed = { ...cardData };
   
   // Extract key savings values
-  processed.total_savings_yearly = extractValueByTag(cardData, 'max_potential_savings') || 0;
+  processed.total_savings_yearly = extractValueByTag(cardData, 'total_savings_yearly') || 0;
   processed.joining_fees = extractValueByTag(cardData, 'joining_fees') || 0;
   processed.net_savings = extractValueByTag(cardData, 'roi') || (processed.total_savings_yearly - processed.joining_fees);
   

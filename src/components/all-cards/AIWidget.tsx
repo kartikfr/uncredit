@@ -56,7 +56,7 @@ Card Information:
 - Rating: ${card.rating}/5 (${card.user_rating_count} reviews)
 - Joining Fee: ${card.joining_fee_text || card.joining_fee}
 - Annual Fee: ${card.annual_fee_text || card.annual_fee}
-- Commission: ${card.commission || 'N/A'}
+
 
 Key Features: ${card.key_features?.join(', ') || 'N/A'}
 

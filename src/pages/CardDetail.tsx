@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CreditCard, Star, Users, ArrowLeft, CheckCircle, XCircle, Info, Calendar, DollarSign, TrendingUp, Sparkles, Award, Shield, Zap, Home, Calculator, BarChart3 } from "lucide-react";
 import { Card as CardType } from "@/services/api";
 
+
 // Helper type guards
 function isObjectWithNameOrHeader(obj: unknown): obj is { name?: string; header?: string } {
   return typeof obj === 'object' && obj !== null && ('name' in obj || 'header' in obj);
@@ -232,7 +233,7 @@ const SPENDING_CATEGORY_MAPPING = {
 // API Response structure mapping
 const API_RESPONSE_MAPPING = {
   spending_breakdown_array: "spending_breakdown_array",
-  total_savings_yearly: "max_potential_savings",
+  total_savings_yearly: "total_savings_yearly",
   joining_fees: "joining_fees",
   net_savings: "roi",
   category_savings: "category_savings"
@@ -338,13 +339,14 @@ const CardDetail = () => {
 
   // Eligibility check state
   const [showEligibilityModal, setShowEligibilityModal] = useState(false);
-  const [eligibilityForm, setEligibilityForm] = useState({ pincode: '', inhandIncome: '', empStatus: 'salaried' });
+  const [eligibilityForm, setEligibilityForm] = useState({ pincode: '', inhandIncome: '', empStatus: 'salaried' as 'salaried' | 'self_employed' });
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [eligibilityError, setEligibilityError] = useState('');
   const [showCongrats, setShowCongrats] = useState(false);
   const [eligibleCount, setEligibleCount] = useState(0);
   const [isEligible, setIsEligible] = useState(false);
   const [showFailureMessage, setShowFailureMessage] = useState(false);
+
 
   // Eligibility tabs state
   const [eligibilityTab, setEligibilityTab] = useState<'salaried' | 'self-employed'>('salaried');
@@ -357,7 +359,7 @@ const CardDetail = () => {
     console.log('User spending:', userSpending);
     
     // Extract key savings values from API response with proper tag mapping
-    processed.total_savings_yearly = extractValueByTag(cardData, 'max_potential_savings') || 0;
+    processed.total_savings_yearly = extractValueByTag(cardData, 'total_savings_yearly') || 0;
     processed.joining_fees = extractValueByTag(cardData, 'joining_fees') || 0;
     processed.net_savings = extractValueByTag(cardData, 'roi') || (processed.total_savings_yearly - processed.joining_fees);
     
@@ -461,7 +463,19 @@ const CardDetail = () => {
       }
     }
     
-    // Search in max_potential_savings array
+    // Search in total_savings_yearly array
+    if (cardData.total_savings_yearly && Array.isArray(cardData.total_savings_yearly)) {
+      const savingsItem = cardData.total_savings_yearly.find((item: any) => 
+        item.tag === tag || 
+        (item.description && item.description.toLowerCase().includes(tag.replace('_', ' ')))
+      );
+      if (savingsItem) {
+        const value = extractNumericValue(savingsItem.description);
+        if (value !== null) return value;
+      }
+    }
+    
+    // Search in max_potential_savings array (fallback for backward compatibility)
     if (cardData.max_potential_savings && Array.isArray(cardData.max_potential_savings)) {
       const savingsItem = cardData.max_potential_savings.find((item: any) => 
         item.tag === tag || 
@@ -812,12 +826,6 @@ const CardDetail = () => {
                       <CreditCard className="h-10 w-10 text-white" />
                     )}
                   </div>
-                  {/* Commission Badge */}
-                  {card.commission && (
-                    <Badge className="mt-2 bg-accent text-white text-xs px-2 py-1">
-                      {card.commission}
-                    </Badge>
-                  )}
                 </div>
                 
                 {/* Card Details */}
@@ -1138,6 +1146,9 @@ const CardDetail = () => {
                   </div>
                 </CardContent>
               </UICard>
+              
+
+              
               {/* Enhanced Exclusion Sections */}
               <div className="grid md:grid-cols-2 gap-6">
                 <UICard className="shadow-card border-l-4 border-red-500">
@@ -1632,6 +1643,8 @@ const CardDetail = () => {
                       </UICard>
                     </div>
                   )}
+                  
+
                 </CardContent>
               </UICard>
             </div>
@@ -1718,7 +1731,7 @@ const CardDetail = () => {
                   <Label>Employment Status</Label>
                   <RadioGroup
                     value={eligibilityForm.empStatus}
-                    onValueChange={(value) => setEligibilityForm(prev => ({ ...prev, empStatus: value }))}
+                    onValueChange={(value) => setEligibilityForm(prev => ({ ...prev, empStatus: value as 'salaried' | 'self_employed' }))}
                     className="mt-2"
                   >
                     <div className="flex items-center space-x-2">

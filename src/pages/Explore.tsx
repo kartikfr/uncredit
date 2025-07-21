@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Filter, Heart, Plus, Star, CreditCard } from "lucide-react";
+import { cardService } from "@/services/api";
 
 const Explore = () => {
   const [searchParams] = useSearchParams();
@@ -52,27 +53,23 @@ const Explore = () => {
         ? categorySlugMap[selectedCategory as keyof typeof categorySlugMap] || ""
         : "";
 
-      const response = await fetch('https://bk-api.bankkaro.com/sp/api/cards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          slug,
-          banks_ids: [],
-          card_networks: [],
-          annualFees: "",
-          credit_score: "",
-          sort_by: "",
-          free_cards: "",
-          eligiblityPayload: {},
-          cardGeniusPayload: {}
-        }),
+      console.log('[Explore] Fetching cards with slug:', slug);
+      const cards = await cardService.getCards({
+        slug,
+        banks_ids: [],
+        card_networks: [],
+        annualFees: "",
+        credit_score: "",
+        sort_by: "",
+        free_cards: "",
+        eligiblityPayload: {},
+        cardGeniusPayload: {}
       });
-      const data = await response.json();
-      setCards(data.cards || []);
+      
+      console.log('[Explore] Cards received:', cards);
+      setCards(cards || []);
     } catch (error) {
-      console.error('Error fetching cards:', error);
+      console.error('[Explore] Error fetching cards:', error);
       setCards([]);
     } finally {
       setLoading(false);
