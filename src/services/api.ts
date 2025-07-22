@@ -120,8 +120,23 @@ class ApiError extends Error {
 }
 
 class CardService {
-  private baseURL = '/api'; // Use proxy instead of direct external API
-  private cardRecommendationURL = '/cg-api/pro'; // Use proxy instead of direct external API
+  private getBaseURL(): string {
+    // In production (Vercel), use direct API calls
+    // In development, use proxy
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return '/api';
+    }
+    return 'https://bk-api.bankkaro.com/sp/api';
+  }
+
+  private getCardGeniusURL(): string {
+    // In production (Vercel), use direct API calls
+    // In development, use proxy
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return '/cg-api';
+    }
+    return 'https://card-recommendation-api-v2.bankkaro.com/cg/api';
+  }
 
   private async makeRequest(url: string, options: RequestInit = {}): Promise<any> {
     console.log('API Service: Making request to:', url);
@@ -172,10 +187,10 @@ class CardService {
     };
 
     console.log('API Service: Sending payload:', payload);
-    console.log('API Service: URL:', `${this.baseURL}/cards`);
+    console.log('API Service: URL:', `${this.getBaseURL()}/cards`);
 
     try {
-      const data = await this.makeRequest(`${this.baseURL}/cards`, {
+      const data = await this.makeRequest(`${this.getBaseURL()}/cards`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -298,7 +313,7 @@ class CardService {
     console.log('API Service: Getting card recommendations with spending data:', spendingData);
     
     try {
-      const data = await this.makeRequest(this.cardRecommendationURL, {
+      const data = await this.makeRequest(`${this.getCardGeniusURL()}/pro`, {
         method: 'POST',
         body: JSON.stringify(spendingData),
       });
@@ -355,7 +370,7 @@ class CardService {
 
       const payload = spendingData || defaultSpendingData;
       
-      const data = await this.makeRequest(this.cardRecommendationURL, {
+      const data = await this.makeRequest(`${this.getCardGeniusURL()}/pro`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -410,7 +425,7 @@ class CardService {
 
     try {
       console.log('Card Genius API: Calling with payload:', defaultPayload);
-      const response = await this.makeRequest(this.cardRecommendationURL, {
+      const response = await this.makeRequest(`${this.getCardGeniusURL()}/pro`, {
         method: 'POST',
         body: JSON.stringify(defaultPayload),
       });
@@ -526,7 +541,7 @@ class CardService {
 
       console.log('API Service: Eligibility payload:', payload);
       
-      const response = await this.makeRequest(`${this.baseURL}/cg-eligiblity`, {
+      const response = await this.makeRequest(`${this.getBaseURL()}/cg-eligiblity`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -583,7 +598,7 @@ class CardService {
 
       console.log('API Service: Card-specific eligibility payload:', payload);
       
-      const response = await this.makeRequest(`${this.baseURL}/cg-eligiblity`, {
+      const response = await this.makeRequest(`${this.getBaseURL()}/cg-eligiblity`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
