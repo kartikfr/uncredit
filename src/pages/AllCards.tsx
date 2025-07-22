@@ -50,6 +50,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
+import ScrollToTop from "@/components/ui/ScrollToTop";
 
 const ConfettiAnimation = () => (
   <div className="pointer-events-none">
@@ -1036,6 +1037,9 @@ const AllCards = () => {
           />
         )}
       </AnimatePresence>
+      
+      {/* Scroll to top button */}
+      <ScrollToTop />
     </div>
   );
 };

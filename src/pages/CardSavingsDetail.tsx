@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   ArrowLeft, 
   TrendingUp, 
@@ -42,13 +43,15 @@ import {
   GraduationCap,
   Home as HomeIcon,
   PieChart,
-  Activity
+  Activity,
+  ChevronDown
 } from "lucide-react";
 import { Card as CardType } from "@/services/api";
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, Title, DonutChart } from '@tremor/react';
 import { RedemptionOptions } from "@/components/redemption/RedemptionOptions";
-import PDFDownloadButton from '@/components/pdf/PDFDownloadButton';
+import FinalPDFGenerator from '@/components/pdf/FinalPDFGenerator';
+import ScrollToTop from "@/components/ui/ScrollToTop";
 
 // Enhanced category mapping with proper icons and display names
 const SPENDING_CATEGORY_MAPPING = {
@@ -280,6 +283,15 @@ const CardSavingsDetail = () => {
   const [savingsBreakdown, setSavingsBreakdown] = useState<SavingsBreakdown[]>([]);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'top5' | 'significant'>('all');
   const [loading, setLoading] = useState(false);
+  const [expandedBreakdowns, setExpandedBreakdowns] = useState<Record<string, boolean>>({});
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
 
   useEffect(() => {
     if (location.state) {
@@ -301,6 +313,24 @@ const CardSavingsDetail = () => {
     }
   }, [calcResult]);
 
+  // Monitor categoryBreakdown state changes
+  useEffect(() => {
+    console.log('🔄 categoryBreakdown state updated:', categoryBreakdown);
+    const amazonItem = categoryBreakdown.find(item => item.category === 'amazon_spends');
+    if (amazonItem) {
+      console.log('🔍 State update - Amazon item:', {
+        category: amazonItem.category,
+        points_earned: amazonItem.points_earned,
+        points_earned_type: typeof amazonItem.points_earned,
+        points_earned_value: amazonItem.points_earned,
+        is_zero: amazonItem.points_earned === 0,
+        is_undefined: amazonItem.points_earned === undefined,
+        spend: amazonItem.spend,
+        savings: amazonItem.savings
+      });
+    }
+  }, [categoryBreakdown]);
+
   const processCategoryBreakdown = () => {
     if (!calcResult) return;
 
@@ -321,6 +351,96 @@ const CardSavingsDetail = () => {
           const totalSavings = Number(calcResult.total_savings_yearly) || 0;
           const percentage = totalSavings > 0 ? (savings / totalSavings) * 100 : 0;
           
+          // COMPREHENSIVE points_earned calculation with multiple fallback strategies
+          let pointsEarned = Number(item.points_earned) || 0;
+          
+          // FALLBACK STRATEGY 1: Extract from explanation text with multiple patterns
+          if (pointsEarned === 0 && item.explanation && item.explanation.length > 0) {
+            const explanationText = item.explanation[0];
+            
+            // Pattern 1: "you will receive (\d+) RP"
+            let pointsMatch = explanationText.match(/you will receive (\d+) RP/);
+            if (pointsMatch) {
+              pointsEarned = Number(pointsMatch[1]);
+              console.log(`🔄 Strategy 1: Extracted points_earned from "you will receive" pattern for ${item.on}:`, {
+                explanation: explanationText,
+                extracted_points: pointsEarned
+              });
+            }
+            
+            // Pattern 2: "which is ₹(\d+)" (for cashback scenarios)
+            if (pointsEarned === 0) {
+              pointsMatch = explanationText.match(/which is ₹([\d,]+)/);
+              if (pointsMatch) {
+                const cashbackAmount = Number(pointsMatch[1].replace(/,/g, ''));
+                pointsEarned = cashbackAmount; // For cashback, points = cashback amount
+                console.log(`🔄 Strategy 2: Extracted points_earned from cashback amount for ${item.on}:`, {
+                  explanation: explanationText,
+                  cashback_amount: cashbackAmount,
+                  extracted_points: pointsEarned
+                });
+              }
+            }
+            
+            // Pattern 3: "(\d+)% Cashback" (calculate from percentage)
+            if (pointsEarned === 0 && item.cashback_percentage) {
+              const cashbackPercent = parseFloat(item.cashback_percentage);
+              if (cashbackPercent > 0) {
+                pointsEarned = Math.round((item.spend * cashbackPercent) / 100);
+                console.log(`🔄 Strategy 3: Calculated points_earned from cashback percentage for ${item.on}:`, {
+                  spend: item.spend,
+                  cashback_percentage: cashbackPercent,
+                  calculated_points: pointsEarned
+                });
+              }
+            }
+          }
+          
+          // FALLBACK STRATEGY 2: Calculate from savings and conversion rate
+          if (pointsEarned === 0 && item.savings && item.conv_rate) {
+            const convRate = Number(item.conv_rate);
+            if (convRate > 0) {
+              pointsEarned = Math.round(item.savings / convRate);
+              console.log(`🔄 Strategy 4: Calculated points_earned from savings/conversion rate for ${item.on}:`, {
+                savings: item.savings,
+                conv_rate: convRate,
+                calculated_points: pointsEarned
+              });
+            }
+          }
+          
+          // FALLBACK STRATEGY 3: Use savings directly if no conversion rate
+          if (pointsEarned === 0 && item.savings) {
+            pointsEarned = item.savings;
+            console.log(`🔄 Strategy 5: Using savings as points_earned for ${item.on}:`, {
+              savings: item.savings,
+              points_earned: pointsEarned
+            });
+          }
+          
+          const convRate = Number(item.conv_rate || 1);
+          const calculatedSavings = pointsEarned * convRate;
+          
+          // CRITICAL DEBUG: Check if points_earned is being processed correctly
+          console.log(`🔴 CRITICAL DEBUG for ${item.on}:`, {
+            raw_points_earned: item.points_earned,
+            raw_type: typeof item.points_earned,
+            final_points_earned: pointsEarned,
+            final_type: typeof pointsEarned,
+            is_zero: pointsEarned === 0,
+            is_nan: isNaN(pointsEarned),
+            explanation_available: item.explanation && item.explanation.length > 0,
+            explanation_text: item.explanation ? item.explanation[0] : null,
+            cashback_percentage: item.cashback_percentage,
+            conv_rate: item.conv_rate,
+            conv_rate_parsed: convRate,
+            calculated_savings: calculatedSavings,
+            api_savings: item.savings,
+            savings_match: calculatedSavings === item.savings,
+            spend: item.spend,
+            strategy_used: pointsEarned > 0 ? 'SUCCESS' : 'FAILED'
+          });
+          
           breakdown.push({
             category: item.on,
             displayName: categoryInfo.displayName,
@@ -335,7 +455,7 @@ const CardSavingsDetail = () => {
             cashback_percentage: item.cashback_percentage,
             maxCap: item.maxCap,
             totalMaxCap: item.totalMaxCap,
-            points_earned: item.points_earned,
+            points_earned: pointsEarned,
             conv_rate: item.conv_rate,
             spend: item.spend
           });
@@ -368,6 +488,22 @@ const CardSavingsDetail = () => {
     const filteredBreakdown = breakdown.filter(item => item.userAmount > 0);
     
     console.log('Processed category breakdown (filtered):', filteredBreakdown);
+    
+    // Debug: Check specific amazon_spends data
+    const amazonItem = filteredBreakdown.find(item => item.category === 'amazon_spends');
+    if (amazonItem) {
+      console.log('🔍 Amazon item debug:', {
+        category: amazonItem.category,
+        points_earned: amazonItem.points_earned,
+        points_earned_type: typeof amazonItem.points_earned,
+        points_earned_parsed: Number(amazonItem.points_earned),
+        spend: amazonItem.spend,
+        savings: amazonItem.savings,
+        cashback_percentage: amazonItem.cashback_percentage,
+        conv_rate: amazonItem.conv_rate
+      });
+    }
+    
     setCategoryBreakdown(filteredBreakdown);
   };
 
@@ -462,6 +598,13 @@ const CardSavingsDetail = () => {
       }));
   };
 
+  const toggleBreakdown = (category: string) => {
+    setExpandedBreakdowns(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
   if (!card || !calcResult) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -506,7 +649,7 @@ const CardSavingsDetail = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <PDFDownloadButton
+              <FinalPDFGenerator
                 cardName={card.name}
                 totalSavings={Number(calcResult.total_savings_yearly)}
                 joiningFees={Number(calcResult.joining_fees)}
@@ -840,7 +983,7 @@ const CardSavingsDetail = () => {
                         </div>
 
                         {/* Cashback and Cap Information */}
-                        {item.cashback_percentage && (
+                        {item.cashback_percentage && parseFloat(item.cashback_percentage) > 0 && (
                           <div className="bg-blue-50 rounded-lg p-3 mb-3">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-blue-700 font-medium">Cashback Rate:</span>
@@ -856,11 +999,45 @@ const CardSavingsDetail = () => {
                         )}
 
                         {/* Calculation Breakdown */}
-                        <div className="bg-purple-50 rounded-lg p-4 mb-3 border border-purple-200">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <Calculator className="h-4 w-4 text-purple-600" />
-                            <span className="text-sm font-semibold text-purple-800">Savings Calculation Breakdown</span>
-                          </div>
+                        <Collapsible 
+                          open={expandedBreakdowns[item.category]} 
+                          onOpenChange={() => toggleBreakdown(item.category)}
+                          className="bg-purple-50 rounded-lg border border-purple-200 mb-3"
+                        >
+                          <CollapsibleTrigger asChild>
+                            <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-purple-100 transition-colors">
+                              <div className="flex items-center space-x-2">
+                                <Calculator className="h-4 w-4 text-purple-600" />
+                                <span className="text-sm font-semibold text-purple-800">Savings Calculation Breakdown</span>
+                              </div>
+                              <ChevronDown 
+                                className={`h-4 w-4 text-purple-600 transition-transform duration-200 ${
+                                  expandedBreakdowns[item.category] ? 'rotate-180' : ''
+                                }`}
+                              />
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-4 pb-4">
+                          
+                          {(() => {
+                            // Cross-check all values for consistency
+                            const pointsEarned = item.points_earned || 0;
+                            const convRate = Number(item.conv_rate || 1);
+                            const calculatedSavings = pointsEarned * convRate;
+                            const actualSavings = item.savings;
+                            
+                            console.log(`🔍 CROSS-CHECK for ${item.category}:`, {
+                              points_earned_display: pointsEarned,
+                              conv_rate: convRate,
+                              calculated_monthly_savings: calculatedSavings,
+                              actual_monthly_savings: actualSavings,
+                              savings_match: calculatedSavings === actualSavings,
+                              formula_check: `${pointsEarned} × ${convRate} = ${calculatedSavings}`,
+                              should_display: `${pointsEarned.toLocaleString()} R.P`
+                            });
+                            
+                            return null;
+                          })()}
                           
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             {/* Points Earned */}
@@ -870,7 +1047,20 @@ const CardSavingsDetail = () => {
                                 <Star className="h-4 w-4 text-yellow-500" />
                               </div>
                               <div className="text-lg font-bold text-purple-800">
-                                {(item.points_earned || Math.round(item.userAmount * (parseFloat(item.cashback_percentage || '0') / 100))).toLocaleString()} R.P
+                                {(() => {
+                                  // DIRECT TEST: Check what's actually being rendered
+                                  const displayValue = (item.points_earned || 0).toLocaleString();
+                                  console.log(`🎯 DIRECT RENDER TEST for ${item.category}:`, {
+                                    points_earned: item.points_earned,
+                                    type: typeof item.points_earned,
+                                    displayValue: displayValue,
+                                    is_zero: item.points_earned === 0,
+                                    is_undefined: item.points_earned === undefined,
+                                    is_null: item.points_earned === null,
+                                    fullItem: JSON.stringify(item, null, 2)
+                                  });
+                                  return displayValue;
+                                })()} R.P
                               </div>
                               <div className="text-xs text-purple-600">
                                 Monthly reward points
@@ -898,7 +1088,18 @@ const CardSavingsDetail = () => {
                                 <PiggyBank className="h-4 w-4 text-green-500" />
                               </div>
                               <div className="text-lg font-bold text-purple-800">
-                                ₹{item.savings.toLocaleString()}
+                                {(() => {
+                                  const calculatedSavings = (item.points_earned || 0) * Number(item.conv_rate || 1);
+                                  console.log(`💰 Monthly Savings calculation for ${item.category}:`, {
+                                    points_earned: item.points_earned,
+                                    conv_rate: item.conv_rate,
+                                    conv_rate_parsed: Number(item.conv_rate || 1),
+                                    calculated_savings: calculatedSavings,
+                                    actual_savings: item.savings,
+                                    match: calculatedSavings === item.savings
+                                  });
+                                  return `₹${item.savings.toLocaleString()}`;
+                                })()}
                               </div>
                               <div className="text-xs text-purple-600">
                                 Points × Conversion Rate
@@ -919,17 +1120,8 @@ const CardSavingsDetail = () => {
                               </div>
                             </div>
                           </div>
-
-                          {/* Calculation Formula */}
-                          <div className="mt-3 p-3 bg-white rounded-lg border border-purple-100">
-                            <div className="text-xs text-purple-700 font-medium mb-1">Calculation Formula:</div>
-                            <div className="text-xs text-purple-600">
-                              <span className="font-mono">
-                                ₹{(item.spend || item.userAmount).toLocaleString()} × {item.cashback_percentage}% = {(item.points_earned || Math.round(item.userAmount * (parseFloat(item.cashback_percentage || '0') / 100))).toLocaleString()} R.P × ₹{(item.conv_rate || '1.00')} = ₹{item.savings.toLocaleString()} monthly
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+                          </CollapsibleContent>
+                        </Collapsible>
 
                         {/* Explanation */}
                         {item.explanation && item.explanation.length > 0 && (
@@ -1171,6 +1363,9 @@ const CardSavingsDetail = () => {
           </Button>
         </div>
       </div>
+      
+      {/* Scroll to top button */}
+      <ScrollToTop />
     </div>
   );
 };

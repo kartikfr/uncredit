@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CreditCard, Star, Users, ArrowLeft, CheckCircle, XCircle, Info, Calendar, DollarSign, TrendingUp, Sparkles, Award, Shield, Zap, Home, Calculator, BarChart3 } from "lucide-react";
 import { Card as CardType } from "@/services/api";
+import ScrollToTop from "@/components/ui/ScrollToTop";
 
 
 // Helper type guards
@@ -1766,6 +1767,9 @@ const CardDetail = () => {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Scroll to top button */}
+      <ScrollToTop />
     </div>
   );
 };

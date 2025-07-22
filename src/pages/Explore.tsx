@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Filter, Heart, Plus, Star, CreditCard } from "lucide-react";
 import { cardService } from "@/services/api";
+import ScrollToTop from "@/components/ui/ScrollToTop";
 
 const Explore = () => {
   const [searchParams] = useSearchParams();
@@ -330,6 +331,9 @@ const Explore = () => {
           </div>
         </div>
       </div>
+      
+      {/* Scroll to top button */}
+      <ScrollToTop />
     </div>
   );
 };

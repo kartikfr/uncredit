@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Calculator as CalculatorIcon, ArrowRight, ArrowLeft, Sparkles, Target, TrendingUp, Award, Crown, Star, Users, CreditCard, Zap, CheckCircle, ExternalLink, BarChart3, Coins, Percent, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cardService } from '@/services/api';
+import ScrollToTop from "@/components/ui/ScrollToTop";
 
 interface BankKaroCard {
   id: string;
@@ -588,6 +589,9 @@ const Calculator = () => {
           </div>
         </div>
       </div>
+      
+      {/* Scroll to top button */}
+      <ScrollToTop />
     </div>
   );
 };

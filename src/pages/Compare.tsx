@@ -1,14 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, X, CreditCard, Star, Check, Minus, ArrowRight } from "lucide-react";
+import ScrollToTop from "@/components/ui/ScrollToTop";
 
 const Compare = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
 
   // Mock card data
   const allCards = [
@@ -440,6 +449,9 @@ const Compare = () => {
           </div>
         )}
       </div>
+      
+      {/* Scroll to top button */}
+      <ScrollToTop />
     </div>
   );
 };
