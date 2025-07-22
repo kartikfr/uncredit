@@ -148,59 +148,56 @@ const Calculator = () => {
   const fetchCardGeniusCards = async () => {
     try {
       console.log('Fetching cards from Card Genius API...');
-      const response = await fetch('/cg-api/pro', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amazon_spends: 1280,
-          flipkart_spends: 10000,
-          grocery_spends_online: 7500,
-          online_food_ordering: 5000,
-          other_online_spends: 3000,
-          other_offline_spends: 5000,
-          dining_or_going_out: 5000,
-          fuel: 5000,
-          school_fees: 20000,
-          rent: 35000,
-          mobile_phone_bills: 1500,
-          electricity_bills: 7500,
-          water_bills: 2500,
-          ott_channels: 1000,
-          new_monthly_cat_1: 0,
-          new_monthly_cat_2: 0,
-          new_monthly_cat_3: 0,
-          hotels_annual: 75000,
-          flights_annual: 75000,
-          insurance_health_annual: 75000,
-          insurance_car_or_bike_annual: 45000,
-          large_electronics_purchase_like_mobile_tv_etc: 100000,
-          all_pharmacy: 99,
-          new_cat_1: 0,
-          new_cat_2: 0,
-          new_cat_3: 0,
-          domestic_lounge_usage_quarterly: 20,
-          international_lounge_usage_quarterly: 13,
-          railway_lounge_usage_quarterly: 1,
-          movie_usage: 3,
-          movie_mov: 600,
-          dining_usage: 3,
-          dining_mov: 1500,
-          selected_card_id: null
-        })
-      });
+      
+      const spendingData = {
+        amazon_spends: 1280,
+        flipkart_spends: 10000,
+        grocery_spends_online: 7500,
+        online_food_ordering: 5000,
+        other_online_spends: 3000,
+        other_offline_spends: 5000,
+        dining_or_going_out: 5000,
+        fuel: 5000,
+        school_fees: 20000,
+        rent: 35000,
+        mobile_phone_bills: 1500,
+        electricity_bills: 7500,
+        water_bills: 2500,
+        ott_channels: 1000,
+        new_monthly_cat_1: 0,
+        new_monthly_cat_2: 0,
+        new_monthly_cat_3: 0,
+        hotels_annual: 75000,
+        flights_annual: 75000,
+        insurance_health_annual: 75000,
+        insurance_car_or_bike_annual: 45000,
+        large_electronics_purchase_like_mobile_tv_etc: 100000,
+        all_pharmacy: 99,
+        new_cat_1: 0,
+        new_cat_2: 0,
+        new_cat_3: 0,
+        domestic_lounge_usage_quarterly: 20,
+        international_lounge_usage_quarterly: 13,
+        railway_lounge_usage_quarterly: 1,
+        movie_usage: 3,
+        movie_mov: 600,
+        dining_usage: 3,
+        dining_mov: 1500,
+        selected_card_id: null
+      };
 
-      if (!response.ok) {
-        throw new Error(`Card Genius API error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await cardService.getCardRecommendations(spendingData);
       console.log('Card Genius API response:', data);
 
       // Extract cards from response - adjust based on actual API structure
       let cards: CardGeniusCard[] = [];
-      if (data.cards && Array.isArray(data.cards)) {
+      if (data.savings && Array.isArray(data.savings)) {
+        cards = data.savings.map((card: any) => ({
+          id: card.seo_card_alias || card.id,
+          name: card.card_name || card.name,
+          seo_card_alias: card.seo_card_alias
+        }));
+      } else if (data.cards && Array.isArray(data.cards)) {
         cards = data.cards;
       } else if (data.data && data.data.cards && Array.isArray(data.data.cards)) {
         cards = data.data.cards;

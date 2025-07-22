@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { X, Star, TrendingUp, FileText, CreditCard, Users, Award, Shield, Calendar, DollarSign, Sparkles, Zap, Info, ExternalLink, Calculator, Target, PiggyBank, Activity, BarChart3, PieChart, Crown, ChevronDown, ChevronUp, TrendingUp as TrendingUpIcon, Gift, ShoppingBag, Plane, Car, Home } from 'lucide-react';
-import { Card } from '@/services/api';
+import { Card, cardService } from '@/services/api';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 // Category questions for UI display (same as CardDetail)
@@ -431,28 +431,14 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
             continue;
           }
           
-          const response = await fetch('https://card-recommendation-api-v2.bankkaro.com/cg/api/pro', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`API Error for ${card.name} (${response.status}):`, errorText);
-            throw new Error(`API error for ${card.name}: ${response.status} - ${errorText}`);
-          }
-          
-          const data = await response.json();
+          const data = await cardService.getCardGeniusDataForCard(card.seo_card_alias, payload);
           console.log(`API Response ${i + 1}/${selectedCards.length} for ${card.name}:`, {
-            responseStatus: response.status,
-            dataKeys: Object.keys(data),
-            savingsCount: data.savings?.length || 0,
-            foundCard: data.savings?.find((c: any) => c.seo_card_alias === card.seo_card_alias) ? 'YES' : 'NO'
+            dataKeys: Object.keys(data || {}),
+            foundCard: data ? 'YES' : 'NO'
           });
           
-          // Find the card in response
-          const found = (data.savings || []).find((c: any) => c.seo_card_alias === card.seo_card_alias);
+          // The data is already the specific card data
+          const found = data;
           
           if (found) {
             const processedResult = processCardSavingsData(found, stableCalcValues);

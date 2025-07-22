@@ -20,6 +20,7 @@ import {
   Zap,
   ExternalLink
 } from 'lucide-react';
+import { cardService } from '@/services/api';
 
 interface RedemptionOption {
   brand: string;
@@ -78,69 +79,51 @@ export const RedemptionOptions: React.FC<RedemptionOptionsProps> = ({
     setError('');
 
     try {
-      const response = await fetch('/cg-api/pro', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amazon_spends: userSpending?.amazon_spends || 1280,
-          flipkart_spends: userSpending?.flipkart_spends || 10000,
-          grocery_spends_online: userSpending?.grocery_spends_online || 7500,
-          online_food_ordering: userSpending?.online_food_ordering || 5000,
-          other_online_spends: userSpending?.other_online_spends || 3000,
-          other_offline_spends: userSpending?.other_offline_spends || 5000,
-          dining_or_going_out: userSpending?.dining_or_going_out || 5000,
-          fuel: userSpending?.fuel || 5000,
-          school_fees: userSpending?.school_fees || 20000,
-          rent: userSpending?.rent || 35000,
-          mobile_phone_bills: userSpending?.mobile_phone_bills || 1500,
-          electricity_bills: userSpending?.electricity_bills || 7500,
-          water_bills: userSpending?.water_bills || 2500,
-          ott_channels: userSpending?.ott_channels || 1000,
-          new_monthly_cat_1: 0,
-          new_monthly_cat_2: 0,
-          new_monthly_cat_3: 0,
-          hotels_annual: userSpending?.hotels_annual || 75000,
-          flights_annual: userSpending?.flights_annual || 75000,
-          insurance_health_annual: userSpending?.insurance_health_annual || 75000,
-          insurance_car_or_bike_annual: userSpending?.insurance_car_or_bike_annual || 45000,
-          large_electronics_purchase_like_mobile_tv_etc: userSpending?.large_electronics_purchase_like_mobile_tv_etc || 100000,
-          all_pharmacy: userSpending?.all_pharmacy || 99,
-          new_cat_1: 0,
-          new_cat_2: 0,
-          new_cat_3: 0,
-          domestic_lounge_usage_quarterly: userSpending?.domestic_lounge_usage_quarterly || 20,
-          international_lounge_usage_quarterly: userSpending?.international_lounge_usage_quarterly || 13,
-          railway_lounge_usage_quarterly: userSpending?.railway_lounge_usage_quarterly || 1,
-          movie_usage: userSpending?.movie_usage || 3,
-          movie_mov: userSpending?.movie_mov || 600,
-          dining_usage: userSpending?.dining_usage || 3,
-          dining_mov: userSpending?.dining_mov || 1500,
-          selected_card_id: null
-        }),
-      });
+      // Use the cardService instead of direct fetch
+      const spendingData = {
+        amazon_spends: userSpending?.amazon_spends || 1280,
+        flipkart_spends: userSpending?.flipkart_spends || 10000,
+        grocery_spends_online: userSpending?.grocery_spends_online || 7500,
+        online_food_ordering: userSpending?.online_food_ordering || 5000,
+        other_online_spends: userSpending?.other_online_spends || 3000,
+        other_offline_spends: userSpending?.other_offline_spends || 5000,
+        dining_or_going_out: userSpending?.dining_or_going_out || 5000,
+        fuel: userSpending?.fuel || 5000,
+        school_fees: userSpending?.school_fees || 20000,
+        rent: userSpending?.rent || 35000,
+        mobile_phone_bills: userSpending?.mobile_phone_bills || 1500,
+        electricity_bills: userSpending?.electricity_bills || 7500,
+        water_bills: userSpending?.water_bills || 2500,
+        ott_channels: userSpending?.ott_channels || 1000,
+        new_monthly_cat_1: 0,
+        new_monthly_cat_2: 0,
+        new_monthly_cat_3: 0,
+        hotels_annual: userSpending?.hotels_annual || 75000,
+        flights_annual: userSpending?.flights_annual || 75000,
+        insurance_health_annual: userSpending?.insurance_health_annual || 75000,
+        insurance_car_or_bike_annual: userSpending?.insurance_car_or_bike_annual || 45000,
+        large_electronics_purchase_like_mobile_tv_etc: userSpending?.large_electronics_purchase_like_mobile_tv_etc || 100000,
+        all_pharmacy: userSpending?.all_pharmacy || 99,
+        new_cat_1: 0,
+        new_cat_2: 0,
+        new_cat_3: 0,
+        domestic_lounge_usage_quarterly: userSpending?.domestic_lounge_usage_quarterly || 20,
+        international_lounge_usage_quarterly: userSpending?.international_lounge_usage_quarterly || 13,
+        railway_lounge_usage_quarterly: userSpending?.railway_lounge_usage_quarterly || 1,
+        movie_usage: userSpending?.movie_usage || 3,
+        movie_mov: userSpending?.movie_mov || 600,
+        dining_usage: userSpending?.dining_usage || 3,
+        dining_mov: userSpending?.dining_mov || 1500,
+        selected_card_id: null
+      };
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch redemption data: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await cardService.getCardGeniusDataForCard(seoCardAlias, spendingData);
       console.log('Redemption data response:', data);
 
-      // Find the specific card by seo_card_alias
-      if (data.savings && Array.isArray(data.savings)) {
-        const cardData = data.savings.find((card: any) => 
-          card.seo_card_alias === seoCardAlias
-        );
-        
-        if (cardData) {
-          setRedemptionData(cardData);
-        } else {
-          setError('Card not found in redemption data');
-        }
+      if (data) {
+        setRedemptionData(data);
       } else {
-        setError('Invalid redemption data format');
+        setError('Card not found in redemption data');
       }
     } catch (err) {
       console.error('Error fetching redemption data:', err);
