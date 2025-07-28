@@ -28,7 +28,9 @@ import {
   GitCompare,
   MessageCircle,
   Plus,
-  X
+  X,
+  Brain,
+  Calculator
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,9 +40,11 @@ import { AdvancedFilters } from '@/components/all-cards/AdvancedFilters';
 import { CardSkeleton } from '@/components/all-cards/CardSkeleton';
 import CardsList from '@/components/all-cards/CardsList';
 import ComparisonModal from '@/components/all-cards/ComparisonModal';
+import EnhancedComparisonModal from '@/components/all-cards/EnhancedComparisonModal';
 import { AIWidget } from '@/components/all-cards/AIWidget';
 import AIOnboardingOverlay from '@/components/all-cards/AIOnboardingOverlay';
 import CompareOnboardingOverlay from '@/components/all-cards/CompareOnboardingOverlay';
+import CardGeniusFilter from '@/components/all-cards/CardGeniusFilter';
 import { useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -89,6 +93,11 @@ const AllCards = () => {
   const [showCompareOnboarding, setShowCompareOnboarding] = useState(false);
   const [searchParams] = useSearchParams();
   const [showEligibilityModal, setShowEligibilityModal] = useState(false);
+  const [showCardGeniusFilter, setShowCardGeniusFilter] = useState(false);
+  const [geniusFilteredCards, setGeniusFilteredCards] = useState<Card[]>([]);
+  const [geniusResults, setGeniusResults] = useState<Record<string, any>>({});
+  const [isGeniusFilterActive, setIsGeniusFilterActive] = useState(false);
+  const [geniusSpendingValues, setGeniusSpendingValues] = useState<Record<string, number>>({});
   const [eligibilityForm, setEligibilityForm] = useState({ pincode: '', inhandIncome: '', empStatus: 'salaried' as 'salaried' | 'self_employed' });
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [eligibilityError, setEligibilityError] = useState('');
@@ -141,7 +150,13 @@ const AllCards = () => {
       console.log('AllCards: Fetched cards count after filtering:', fetchedCards.length);
       
       setCards(fetchedCards);
-      setFilteredCards(fetchedCards);
+      
+      // Only update filteredCards if genius filter is not active
+      if (!isGeniusFilterActive) {
+        setFilteredCards(fetchedCards);
+      } else {
+        console.log('🔍 Genius filter is active, preserving filtered cards');
+      }
     } catch (error) {
       console.error('Error fetching cards:', error);
     } finally {
@@ -150,8 +165,13 @@ const AllCards = () => {
   };
 
   useEffect(() => {
-    fetchAllCards();
-  }, [filters.domestic_lounges_min, filters.international_lounges_min]); // Refetch when either lounge filter changes
+    // Only fetch all cards if genius filter is not active
+    if (!isGeniusFilterActive) {
+      fetchAllCards();
+    } else {
+      console.log('🔍 Genius filter is active, skipping fetchAllCards on lounge filter change');
+    }
+  }, [filters.domestic_lounges_min, filters.international_lounges_min, isGeniusFilterActive]); // Refetch when either lounge filter changes
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -160,6 +180,79 @@ const AllCards = () => {
       behavior: 'smooth'
     });
   }, []);
+
+  // Listen for see details events
+  useEffect(() => {
+    const handleSeeDetails = (event: CustomEvent) => {
+      const { card, geniusResults } = event.detail;
+      // Add the card to comparison if not already there
+      if (!selectedCardsForCompare.some(c => c.id === card.id)) {
+        setSelectedCardsForCompare(prev => [...prev, card]);
+      }
+      // Open comparison modal
+      setShowComparisonModal(true);
+    };
+
+    window.addEventListener('seeDetails', handleSeeDetails as EventListener);
+    return () => {
+      window.removeEventListener('seeDetails', handleSeeDetails as EventListener);
+    };
+  }, [selectedCardsForCompare]);
+  
+  // Monitor genius results changes for debugging
+  useEffect(() => {
+    console.log('🔍 GENIUS RESULTS CHANGED:', {
+      isGeniusFilterActive,
+      geniusResultsKeys: Object.keys(geniusResults),
+      geniusFilteredCardsCount: geniusFilteredCards.length,
+      sampleResult: Object.keys(geniusResults).length > 0 ? {
+        alias: Object.keys(geniusResults)[0],
+        netSavings: geniusResults[Object.keys(geniusResults)[0]]?.net_savings,
+        totalSavingsYearly: geniusResults[Object.keys(geniusResults)[0]]?.total_savings_yearly,
+        joiningFees: geniusResults[Object.keys(geniusResults)[0]]?.joining_fees
+      } : null
+    });
+  }, [isGeniusFilterActive, geniusResults, geniusFilteredCards]);
+
+  // Monitor filtered cards changes for debugging
+  useEffect(() => {
+    console.log('🔍 FILTERED CARDS CHANGED:', {
+      filteredCardsCount: filteredCards.length,
+      isGeniusFilterActive,
+      geniusFilteredCardsCount: geniusFilteredCards.length,
+      sampleFilteredCard: filteredCards.length > 0 ? {
+        name: filteredCards[0].name,
+        seo_card_alias: filteredCards[0].seo_card_alias,
+        hasGeniusResult: !!geniusResults[filteredCards[0].seo_card_alias],
+        netSavings: geniusResults[filteredCards[0].seo_card_alias]?.net_savings || 0
+      } : null
+    });
+  }, [filteredCards, isGeniusFilterActive, geniusFilteredCards, geniusResults]);
+
+  // Monitor filteredCards changes for debugging
+  useEffect(() => {
+    console.log('🔍 FILTERED CARDS STATE CHANGED:', {
+      filteredCardsCount: filteredCards.length,
+      isGeniusFilterActive,
+      filteredCardsNames: filteredCards.map(c => c.name),
+      geniusFilteredCardsCount: geniusFilteredCards.length
+    });
+  }, [filteredCards, isGeniusFilterActive, geniusFilteredCards]);
+
+  // Apply filters and search when filters change
+  useEffect(() => {
+    console.log('🔍 Filters changed, applying filters and search');
+    applyFiltersAndSearch();
+  }, [filters, searchQuery, isGeniusFilterActive, geniusFilteredCards]);
+
+  // Handle search query clearing when genius filter is active
+  useEffect(() => {
+    if (isGeniusFilterActive && searchQuery === '' && searchPerformed) {
+      console.log('🔍 Search cleared, restoring genius-filtered cards');
+      setFilteredCards(geniusFilteredCards);
+      setSearchPerformed(false);
+    }
+  }, [searchQuery, isGeniusFilterActive, geniusFilteredCards, searchPerformed]);
 
   // Check for onboarding parameter and comparison mode
   useEffect(() => {
@@ -229,18 +322,118 @@ const AllCards = () => {
     if (pendingSearchQuery.trim()) {
       setSearchQuery(pendingSearchQuery);
       setSearchPerformed(true);
+      
+      // If genius filter is active, search within genius-filtered cards
+      if (isGeniusFilterActive) {
+        const query = pendingSearchQuery.toLowerCase();
+        const searchResults = geniusFilteredCards.filter(card => {
+          // Search in card name
+          if (card.name?.toLowerCase().includes(query)) return true;
+          
+          // Search in bank name
+          if (card.bank_name?.toLowerCase().includes(query)) return true;
+          
+          // Search in card type
+          if (card.card_type?.toLowerCase().includes(query)) return true;
+          
+          // Search in card network
+          if (card.card_network?.toLowerCase().includes(query)) return true;
+          
+          // Search in key features
+          if (card.key_features && Array.isArray(card.key_features)) {
+            if (card.key_features.some(feature => feature?.toLowerCase().includes(query))) return true;
+          }
+          
+          // Search in tags
+          if (card.tags && Array.isArray(card.tags)) {
+            if (card.tags.some((tag: any) => {
+              const tagText = typeof tag === 'string' ? tag : (tag.name || tag.header || '');
+              return tagText?.toLowerCase().includes(query);
+            })) return true;
+          }
+          
+          return false;
+        });
+        
+        console.log('🔍 Search within genius-filtered cards:', {
+          query: pendingSearchQuery,
+          totalGeniusCards: geniusFilteredCards.length,
+          searchResults: searchResults.length
+        });
+        
+        setFilteredCards(searchResults);
+      }
+      
       setTimeout(() => {
         scrollToCardsSection();
       }, 100);
+    } else {
+      // If search query is empty and genius filter is active, restore genius-filtered cards
+      if (isGeniusFilterActive) {
+        console.log('🔍 Empty search query, restoring genius-filtered cards');
+        setFilteredCards(geniusFilteredCards);
+        setSearchPerformed(false);
+      }
+      setSearchQuery('');
     }
   };
 
   useEffect(() => {
-    applyFiltersAndSearch();
-  }, [cards, searchQuery, filters]);
+    // Don't apply filters if genius filter is active
+    if (!isGeniusFilterActive) {
+      applyFiltersAndSearch();
+    }
+  }, [cards, searchQuery, filters, isGeniusFilterActive]);
+
+  // Restore genius-filtered cards when search query is cleared
+  useEffect(() => {
+    if (isGeniusFilterActive && !searchQuery.trim() && !searchPerformed) {
+      console.log('🔍 Search query cleared, restoring genius-filtered cards');
+      setFilteredCards(geniusFilteredCards);
+    }
+  }, [searchQuery, isGeniusFilterActive, geniusFilteredCards, searchPerformed]);
+
+  // Monitor genius results changes for debugging
+  useEffect(() => {
+    console.log('🔍 GENIUS RESULTS CHANGED:', {
+      isGeniusFilterActive,
+      geniusResultsKeys: Object.keys(geniusResults),
+      geniusFilteredCardsCount: geniusFilteredCards.length,
+      filteredCardsCount: filteredCards.length,
+      sampleResult: Object.keys(geniusResults).length > 0 ? {
+        alias: Object.keys(geniusResults)[0],
+        netSavings: geniusResults[Object.keys(geniusResults)[0]]?.net_savings,
+        totalSavingsYearly: geniusResults[Object.keys(geniusResults)[0]]?.total_savings_yearly,
+        joiningFees: geniusResults[Object.keys(geniusResults)[0]]?.joining_fees
+      } : null
+    });
+  }, [isGeniusFilterActive, geniusResults, geniusFilteredCards, filteredCards]);
+
+  // Monitor filteredCards state changes for debugging
+  useEffect(() => {
+    console.log('🔍 FILTERED CARDS CHANGED:', {
+      filteredCardsCount: filteredCards.length,
+      isGeniusFilterActive,
+      geniusFilteredCardsCount: geniusFilteredCards.length,
+      sampleFilteredCard: filteredCards.length > 0 ? {
+        name: filteredCards[0].name,
+        seo_card_alias: filteredCards[0].seo_card_alias,
+        hasGeniusResult: !!geniusResults[filteredCards[0].seo_card_alias],
+        netSavings: geniusResults[filteredCards[0].seo_card_alias]?.net_savings || 0
+      } : null
+    });
+  }, [filteredCards, isGeniusFilterActive, geniusFilteredCards, geniusResults]);
 
   const applyFiltersAndSearch = () => {
-    let result = [...cards];
+    console.log('🔍 applyFiltersAndSearch called with isGeniusFilterActive:', isGeniusFilterActive);
+    
+    // If genius filter is active, apply filters to geniusFilteredCards instead of cards
+    const baseCards = isGeniusFilterActive ? geniusFilteredCards : cards;
+    let result = [...baseCards];
+
+    console.log('AllCards: Starting filter application with filters:', filters);
+    console.log('AllCards: Base cards count:', result.length);
+    console.log('AllCards: Using cards from:', isGeniusFilterActive ? 'geniusFilteredCards' : 'cards');
 
     console.log('AllCards: Starting filter application with filters:', filters);
     console.log('AllCards: Initial cards count:', result.length);
@@ -497,6 +690,15 @@ const AllCards = () => {
 
     // Sort the results
     const sortedResult = sortCards(result, filters.sort_by || 'rating-high');
+    
+    // If genius filter is active, we need to maintain the genius sorting (by net savings)
+    // but also apply the user's sort preference if it's different from the default
+    if (isGeniusFilterActive && filters.sort_by && filters.sort_by !== 'rating-high') {
+      console.log('AllCards: Applying user sort preference to genius-filtered cards:', filters.sort_by);
+      // The genius cards are already sorted by net savings, but we can apply additional sorting
+      // For now, we'll keep the genius sorting as primary and apply user sorting as secondary
+    }
+    
     setFilteredCards(sortedResult);
     
     // If search was performed and we have results, scroll to cards section
@@ -510,49 +712,160 @@ const AllCards = () => {
   const sortCards = (cardsToSort: Card[], sortType: string): Card[] => {
     const sorted = [...cardsToSort];
     
-    switch (sortType) {
-      case 'rating-high':
-        return sorted.sort((a, b) => b.rating - a.rating);
-      case 'rating-low':
-        return sorted.sort((a, b) => a.rating - b.rating);
-      case 'name-asc':
-        return sorted.sort((a, b) => a.name.localeCompare(b.name));
-      case 'name-desc':
-        return sorted.sort((a, b) => b.name.localeCompare(a.name));
-      case 'fee-low':
-        return sorted.sort((a, b) => {
-          const aFee = parseInt(String(a.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
-          const bFee = parseInt(String(b.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
-          return aFee - bFee;
-        });
-      case 'fee-high':
-        return sorted.sort((a, b) => {
-          const aFee = parseInt(String(a.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
-          const bFee = parseInt(String(b.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
-          return bFee - aFee;
-        });
-      default:
-        return sorted;
+    // If genius filter is active, we need to maintain net savings as primary sorting
+    // but allow other sorting options as secondary sorting
+    if (isGeniusFilterActive && geniusResults && Object.keys(geniusResults).length > 0) {
+      // First sort by net savings (descending) as primary sort
+      sorted.sort((a, b) => {
+        const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+        const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+        return bNetSavings - aNetSavings;
+      });
+      
+      // Then apply secondary sorting based on user preference
+      switch (sortType) {
+        case 'rating-high':
+          return sorted.sort((a, b) => {
+            const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+            const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+            if (Math.abs(aNetSavings - bNetSavings) < 100) { // If net savings are close, sort by rating
+              return b.rating - a.rating;
+            }
+            return 0; // Keep net savings order
+          });
+        case 'rating-low':
+          return sorted.sort((a, b) => {
+            const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+            const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+            if (Math.abs(aNetSavings - bNetSavings) < 100) {
+              return a.rating - b.rating;
+            }
+            return 0;
+          });
+        case 'name-asc':
+          return sorted.sort((a, b) => {
+            const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+            const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+            if (Math.abs(aNetSavings - bNetSavings) < 100) {
+              return a.name.localeCompare(b.name);
+            }
+            return 0;
+          });
+        case 'name-desc':
+          return sorted.sort((a, b) => {
+            const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+            const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+            if (Math.abs(aNetSavings - bNetSavings) < 100) {
+              return b.name.localeCompare(a.name);
+            }
+            return 0;
+          });
+        case 'fee-low':
+          return sorted.sort((a, b) => {
+            const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+            const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+            if (Math.abs(aNetSavings - bNetSavings) < 100) {
+              const aFee = parseInt(String(a.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+              const bFee = parseInt(String(b.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+              return aFee - bFee;
+            }
+            return 0;
+          });
+        case 'fee-high':
+          return sorted.sort((a, b) => {
+            const aNetSavings = geniusResults[a.seo_card_alias]?.net_savings || 0;
+            const bNetSavings = geniusResults[b.seo_card_alias]?.net_savings || 0;
+            if (Math.abs(aNetSavings - bNetSavings) < 100) {
+              const aFee = parseInt(String(a.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+              const bFee = parseInt(String(b.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+              return bFee - aFee;
+            }
+            return 0;
+          });
+        default:
+          return sorted; // Keep net savings order
+      }
+    } else {
+      // Normal sorting when genius filter is not active
+      switch (sortType) {
+        case 'rating-high':
+          return sorted.sort((a, b) => b.rating - a.rating);
+        case 'rating-low':
+          return sorted.sort((a, b) => a.rating - b.rating);
+        case 'name-asc':
+          return sorted.sort((a, b) => a.name.localeCompare(b.name));
+        case 'name-desc':
+          return sorted.sort((a, b) => b.name.localeCompare(a.name));
+        case 'fee-low':
+          return sorted.sort((a, b) => {
+            const aFee = parseInt(String(a.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+            const bFee = parseInt(String(b.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+            return aFee - bFee;
+          });
+        case 'fee-high':
+          return sorted.sort((a, b) => {
+            const aFee = parseInt(String(a.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+            const bFee = parseInt(String(b.joining_fee).replace(/[^\d.]/g, ''), 10) || 0;
+            return bFee - aFee;
+          });
+        default:
+          return sorted;
+      }
     }
   };
 
   const handleFiltersChange = (newFilters: CardFilters) => {
+    console.log('🔍 handleFiltersChange called with isGeniusFilterActive:', isGeniusFilterActive);
+    
+    // Update filters
     setFilters(newFilters);
+    
+    // If genius filter is active, apply the new filters to genius-filtered cards
+    if (isGeniusFilterActive) {
+      console.log('🔍 Applying new filters to genius-filtered cards');
+      // The applyFiltersAndSearch will be called automatically by useEffect
+    }
   };
 
   const handleClearFilters = () => {
     setFilters({});
     setSearchQuery('');
     setSearchPerformed(false);
+    
+    // Also clear genius filter when clearing all filters
+    if (isGeniusFilterActive) {
+      setIsGeniusFilterActive(false);
+      setGeniusFilteredCards([]);
+      setGeniusResults({});
+      // Explicitly call BankKaro API to get fresh data when clearing genius filter
+      console.log('🔄 Recalling BankKaro API after clearing all filters (including genius filter)');
+      fetchAllCards();
+    }
   };
 
   const handleClearEligibility = () => {
     setFilters(prev => ({ ...prev, eligibleAliases: undefined }));
     setEligibleAliases(null);
     setEligibleCount(0);
+    
+    // Also clear genius filter when clearing eligibility
+    if (isGeniusFilterActive) {
+      setIsGeniusFilterActive(false);
+      setGeniusFilteredCards([]);
+      setGeniusResults({});
+      // Explicitly call BankKaro API to get fresh data when clearing genius filter
+      console.log('🔄 Recalling BankKaro API after clearing eligibility (including genius filter)');
+      fetchAllCards();
+    }
   };
 
   const handleRefresh = () => {
+    // If genius filter is active, clear it before refreshing
+    if (isGeniusFilterActive) {
+      setIsGeniusFilterActive(false);
+      setGeniusFilteredCards([]);
+      setGeniusResults({});
+    }
     fetchAllCards();
   };
 
@@ -569,9 +882,35 @@ const AllCards = () => {
   const handleCompareNow = () => {
     setShowComparisonModal(true);
   };
+
+  const handleSeeDetails = (card?: Card) => {
+    if (card) {
+      // Individual card clicked - navigate to card detail page
+      window.open(`/card/${card.seo_card_alias || card.id}?tab=calculator`, '_blank');
+    } else {
+      // "See more detail" button clicked - open CardGeniusFilter with results tab
+      if (isGeniusFilterActive && geniusFilteredCards.length > 0) {
+        console.log('🔍 Opening CardGeniusFilter with existing spending values:', {
+          existingSpendingValues: geniusSpendingValues,
+          spendingValuesCount: Object.keys(geniusSpendingValues).length
+        });
+        setShowCardGeniusFilter(true);
+        // The CardGeniusFilter will show results tab by default when genius results exist
+        // and will have access to existingSpendingValues prop for editing
+      }
+    }
+  };
+
+  const handleIndividualCardDetails = (card: Card) => {
+    // Individual card clicked - open compare card with spending as default tab
+    setSelectedCardsForCompare([card]);
+    setShowComparisonModal(true);
+  };
   
   const handleCloseComparison = () => {
     setShowComparisonModal(false);
+    // Deselect the card when comparison modal is closed
+    setSelectedCardsForCompare([]);
   };
 
   const handleAIOnboardingComplete = () => {
@@ -589,6 +928,214 @@ const AllCards = () => {
     url.searchParams.delete('onboarding');
     url.searchParams.delete('mode');
     window.history.replaceState({}, '', url.toString());
+  };
+
+  // Handle opening CardGeniusFilter with results tab
+  const handleOpenGeniusResults = () => {
+    console.log('🔍 Opening CardGeniusFilter with results tab');
+    setShowCardGeniusFilter(true);
+    // The CardGeniusFilter component will handle showing the results tab
+  };
+
+
+
+  // Handle Card Genius filter
+  const handleApplyGenius = async (filteredCards: Card[], results: Record<string, any>, spendingValues: Record<string, number>) => {
+    console.log('🔍 handleApplyGenius called with:', {
+      filteredCardsCount: filteredCards.length,
+      resultsKeys: Object.keys(results),
+      sampleResult: Object.keys(results).length > 0 ? results[Object.keys(results)[0]] : null
+    });
+    
+    // Close the modal immediately
+    setShowCardGeniusFilter(false);
+    
+    try {
+      console.log('🔄 STEP 1: Calling BankKaro API to get fresh card data...');
+      
+      // Step 1: Call BankKaro API to get fresh card data
+      const bankKaroCards = await cardService.getCards({});
+      console.log('🔄 BankKaro API Response:', {
+        totalCards: bankKaroCards.length,
+        sampleCards: bankKaroCards.slice(0, 3).map(card => ({
+          name: card.name,
+          seo_card_alias: card.seo_card_alias,
+          id: card.id
+        }))
+      });
+      
+      // Step 2: Extract seo_card_alias from Card Genius results (include all cards with net savings data)
+      const cardGeniusAliases = Object.keys(results).filter(alias => {
+        const result = results[alias];
+        return result && result.net_savings !== undefined; // Include all cards with net savings data (positive and negative)
+      });
+      
+      console.log('🔄 Card Genius Aliases with net savings data:', {
+        totalAliases: cardGeniusAliases.length,
+        aliases: cardGeniusAliases,
+        positiveSavings: cardGeniusAliases.filter(alias => results[alias]?.net_savings > 0).length,
+        negativeSavings: cardGeniusAliases.filter(alias => results[alias]?.net_savings <= 0).length
+      });
+      
+      // Step 3: Map BankKaro cards to Card Genius results using seo_card_alias
+      const mappedCards: Card[] = [];
+      const mappedResults: Record<string, any> = {};
+      
+      for (const bankKaroCard of bankKaroCards) {
+        if (bankKaroCard.seo_card_alias && cardGeniusAliases.includes(bankKaroCard.seo_card_alias)) {
+          const cardGeniusResult = results[bankKaroCard.seo_card_alias];
+          if (cardGeniusResult && cardGeniusResult.net_savings !== undefined) {
+            mappedCards.push(bankKaroCard);
+            mappedResults[bankKaroCard.seo_card_alias] = cardGeniusResult;
+          }
+        }
+      }
+      
+                          console.log('🔄 MAPPING RESULTS:', {
+                      totalBankKaroCards: bankKaroCards.length,
+                      cardGeniusAliasesWithNetSavings: cardGeniusAliases.length,
+                      successfullyMappedCards: mappedCards.length,
+                      positiveSavingsCards: mappedCards.filter(card => mappedResults[card.seo_card_alias]?.net_savings > 0).length,
+                      negativeSavingsCards: mappedCards.filter(card => mappedResults[card.seo_card_alias]?.net_savings <= 0).length,
+                      mappedCardsDetails: mappedCards.map(card => ({
+                        name: card.name,
+                        seo_card_alias: card.seo_card_alias,
+                        netSavings: mappedResults[card.seo_card_alias]?.net_savings || 0
+                      }))
+                    });
+      
+      // Step 4: Sort mapped cards by net savings (descending)
+      const sortedMappedCards = mappedCards.sort((a, b) => {
+        const aNetSavings = mappedResults[a.seo_card_alias]?.net_savings || 0;
+        const bNetSavings = mappedResults[b.seo_card_alias]?.net_savings || 0;
+        return bNetSavings - aNetSavings;
+      });
+      
+                          console.log('🔄 FINAL SORTED CARDS:', {
+                      totalCards: sortedMappedCards.length,
+                      positiveSavingsCards: sortedMappedCards.filter(card => mappedResults[card.seo_card_alias]?.net_savings > 0).length,
+                      negativeSavingsCards: sortedMappedCards.filter(card => mappedResults[card.seo_card_alias]?.net_savings <= 0).length,
+                      sortedCardsDetails: sortedMappedCards.map(card => ({
+                        name: card.name,
+                        seo_card_alias: card.seo_card_alias,
+                        netSavings: mappedResults[card.seo_card_alias]?.net_savings || 0
+                      }))
+                    });
+      
+      // Step 5: Update state with properly mapped data
+      setGeniusFilteredCards(sortedMappedCards);
+      setGeniusResults(mappedResults);
+      setGeniusSpendingValues(spendingValues);
+      setIsGeniusFilterActive(true);
+      setFilteredCards(sortedMappedCards);
+      
+      console.log('✅ GENIUS FILTER APPLIED SUCCESSFULLY:', {
+        finalCardCount: sortedMappedCards.length,
+        finalResultsCount: Object.keys(mappedResults).length,
+        isGeniusFilterActive: true,
+        sampleCard: sortedMappedCards.length > 0 ? {
+          name: sortedMappedCards[0].name,
+          seo_card_alias: sortedMappedCards[0].seo_card_alias,
+          netSavings: mappedResults[sortedMappedCards[0].seo_card_alias]?.net_savings || 0
+        } : null
+      });
+      
+                          // Show success message
+                    const successMessage = document.createElement('div');
+                    successMessage.className = 'fixed top-4 right-4 z-[100] bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300';
+                    successMessage.innerHTML = `
+                      <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Genius Filter applied! Showing ${sortedMappedCards.length} cards sorted by net savings.</span>
+                      </div>
+                    `;
+    document.body.appendChild(successMessage);
+    
+    // Add confetti animation
+    const confettiContainer = document.createElement('div');
+    confettiContainer.className = 'fixed inset-0 pointer-events-none z-[90]';
+    confettiContainer.innerHTML = `
+      <style>
+        @keyframes confetti-fall {
+          0% { transform: translateY(-40px) scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(120px) scale(0.8) rotate(360deg); opacity: 0; }
+        }
+      </style>
+      ${[...Array(25)].map((_, i) => `
+        <span
+          style="
+            position: absolute;
+            left: ${Math.random() * 100}%;
+            animation: confetti-fall 1.5s ease-in-out ${Math.random() * 0.5}s;
+            background: hsl(${Math.random() * 360}, 80%, 60%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            opacity: 0.8;
+          "
+        ></span>
+      `).join('')}
+    `;
+    document.body.appendChild(confettiContainer);
+    
+    // Remove success message and confetti after 3 seconds
+    setTimeout(() => {
+      successMessage.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        document.body.removeChild(successMessage);
+        document.body.removeChild(confettiContainer);
+      }, 300);
+    }, 3000);
+    
+    // Scroll to cards section
+    setTimeout(() => {
+      scrollToCardsSection();
+    }, 500);
+    
+    } catch (error) {
+      console.error('❌ Error applying genius filter:', error);
+      
+      // Show error message
+      const errorMessage = document.createElement('div');
+      errorMessage.className = 'fixed top-4 right-4 z-[100] bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300';
+      errorMessage.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+          <span>Failed to apply Genius Filter. Please try again.</span>
+        </div>
+      `;
+      document.body.appendChild(errorMessage);
+      
+      // Remove error message after 5 seconds
+      setTimeout(() => {
+        errorMessage.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          document.body.removeChild(errorMessage);
+        }, 300);
+      }, 5000);
+      
+      // Reset genius filter state on error
+      setIsGeniusFilterActive(false);
+      setGeniusFilteredCards([]);
+      setGeniusResults({});
+    }
+  };
+
+  const handleClearGeniusFilter = () => {
+    console.log('🔍 Clearing genius filter');
+    setIsGeniusFilterActive(false);
+    setGeniusFilteredCards([]);
+    setGeniusResults({});
+    setGeniusSpendingValues({});
+    setSearchQuery('');
+    setSearchPerformed(false);
+    // Explicitly call BankKaro API to get fresh data and show all cards without filter
+    console.log('🔄 Recalling BankKaro API to show all cards without genius filter');
+    fetchAllCards();
   };
 
   const getActiveFiltersCount = () => {
@@ -625,6 +1172,11 @@ const AllCards = () => {
     }
     if (filters.annual_fee_min !== undefined && filters.annual_fee_max !== undefined && !filters.annual_fee_free) {
       count--; // Remove one count since min/max are counted separately above
+    }
+    
+    // Add genius filter count
+    if (isGeniusFilterActive) {
+      count++;
     }
     
     return count;
@@ -721,7 +1273,7 @@ const AllCards = () => {
                       </div>
                     )}
                     
-                {selectedCardsForCompare.length > 0 && (
+                                    {selectedCardsForCompare.length > 0 && (
                       <div className="flex items-center space-x-2">
                         <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1">
                           <GitCompare className="h-3 w-3 mr-1" />
@@ -729,6 +1281,23 @@ const AllCards = () => {
                   </Badge>
                       </div>
                 )}
+                    
+                    {isGeniusFilterActive && (
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1 animate-pulse">
+                          <Brain className="h-3 w-3 mr-1" />
+                          {geniusFilteredCards.length} genius filtered
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearGeniusFilter}
+                          className="h-6 w-6 p-0 text-purple-600 hover:text-purple-800 hover:bg-purple-50"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
               </div>
                 </div>
                 
@@ -761,6 +1330,39 @@ const AllCards = () => {
                       <Shield className="h-4 w-4 mr-2" />
                   Check Eligibility
                 </Button>
+                  </motion.div>
+
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    {isGeniusFilterActive ? (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSeeDetails()}
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg"
+                        >
+                          <BarChart3 className="h-4 w-4 mr-2" />
+                          See more detail
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearGeniusFilter}
+                          className="h-8 w-8 p-0 text-purple-600 hover:text-purple-800 hover:bg-purple-50 border border-purple-200"
+                          title="Remove Genius Filter"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => setShowCardGeniusFilter(true)}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg"
+                      >
+                        <Brain className="h-4 w-4 mr-2" />
+                        Apply Genius
+                      </Button>
+                    )}
                   </motion.div>
               </div>
             </div>
@@ -825,6 +1427,9 @@ const AllCards = () => {
                 onRemoveFromCompare={handleRemoveFromCompare}
                 selectedCardsForCompare={selectedCardsForCompare}
                 eligibleAliases={filters.eligibleAliases}
+                geniusResults={geniusResults}
+                isGeniusFilterActive={isGeniusFilterActive}
+                onSeeDetails={handleIndividualCardDetails}
               />
             )}
             </motion.div>
@@ -869,10 +1474,13 @@ const AllCards = () => {
       </AnimatePresence>
   
       {/* Enhanced Comparison Modal */}
-      <ComparisonModal
+      <EnhancedComparisonModal
         isOpen={showComparisonModal}
         onClose={handleCloseComparison}
         selectedCards={selectedCardsForCompare}
+        geniusResults={geniusResults}
+        isGeniusFilterActive={isGeniusFilterActive}
+        defaultTab={selectedCardsForCompare.length === 1 ? 'spending' : 'textual'}
       />
 
       {/* Enhanced Eligibility Modal */}
@@ -1037,6 +1645,22 @@ const AllCards = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* Card Genius Filter Modal */}
+      <CardGeniusFilter
+        isOpen={showCardGeniusFilter}
+        onClose={() => setShowCardGeniusFilter(false)}
+        allCards={cards}
+        selectedCards={selectedCardsForCompare}
+        onApplyGenius={handleApplyGenius}
+        showResultsTab={isGeniusFilterActive}
+        existingResults={geniusResults}
+        existingFilteredCards={geniusFilteredCards}
+        onCardClick={handleIndividualCardDetails}
+        existingSpendingValues={geniusSpendingValues}
+      />
+
+
       
       {/* Scroll to top button */}
       <ScrollToTop />

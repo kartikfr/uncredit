@@ -12,6 +12,9 @@ interface CardsListProps {
   onRemoveFromCompare: (card: Card) => void;
   selectedCardsForCompare: Card[];
   eligibleAliases?: string[];
+  geniusResults?: Record<string, any>;
+  isGeniusFilterActive?: boolean;
+  onSeeDetails?: (card: Card) => void;
 }
 
 const CardsList: React.FC<CardsListProps> = ({
@@ -20,7 +23,10 @@ const CardsList: React.FC<CardsListProps> = ({
   onAddToCompare,
   onRemoveFromCompare,
   selectedCardsForCompare,
-  eligibleAliases
+  eligibleAliases,
+  geniusResults,
+  isGeniusFilterActive,
+  onSeeDetails
 }) => {
   return (
     <div className="space-y-6">
@@ -85,6 +91,9 @@ const CardsList: React.FC<CardsListProps> = ({
                 isInCompareList={selectedCardsForCompare.some(c => c.id === card.id)}
                 canAddToCompare={selectedCardsForCompare.length < 3}
                 eligibleAliases={eligibleAliases}
+                geniusResults={geniusResults}
+                isGeniusFilterActive={isGeniusFilterActive}
+                onSeeDetails={onSeeDetails}
               />
             </motion.div>
           ))}

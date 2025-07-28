@@ -83,6 +83,11 @@ export default function CardGenius() {
     }
   };
 
+  const skipAll = () => {
+    // Skip all remaining questions and go directly to the last question
+    setCurrentStep(API_QUESTIONS.length - 1);
+  };
+
   const submitToAPI = async () => {
     setLoading(true);
     setApiError("");
@@ -569,11 +574,11 @@ export default function CardGenius() {
                 <div className="flex items-center space-x-3">
                   <Button 
                     variant="ghost" 
-                    onClick={nextStep} 
+                    onClick={skipAll} 
                     disabled={loading}
                     className="px-6 py-2"
                   >
-              Skip
+              Skip All
             </Button>
                   
                   <Button 

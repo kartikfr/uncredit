@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { X, Star, TrendingUp, FileText, CreditCard, Users, Award, Shield, Calendar, DollarSign, Sparkles, Zap, Info, ExternalLink, Calculator, Target, PiggyBank, Activity, BarChart3, PieChart, Crown, ChevronDown, ChevronUp, TrendingUp as TrendingUpIcon, Gift, ShoppingBag, Plane, Car, Home } from 'lucide-react';
+import { X, Star, TrendingUp, FileText, CreditCard, Users, Award, Shield, Calendar, DollarSign, Sparkles, Zap, Info, ExternalLink, Calculator, Target, PiggyBank, Activity, BarChart3, PieChart, Crown, ChevronDown, ChevronUp, TrendingUp as TrendingUpIcon, Gift, ShoppingBag, Plane, Car, Home, XCircle } from 'lucide-react';
 import { Card, cardService } from '@/services/api';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -102,9 +102,11 @@ interface ComparisonModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedCards: Card[];
+  geniusResults?: Record<string, any>;
+  isGeniusFilterActive?: boolean;
 }
 
-const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, selectedCards }) => {
+const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, selectedCards, geniusResults, isGeniusFilterActive }) => {
   const [activeTab, setActiveTab] = useState('textual');
   
   // Spending calculation state
@@ -115,6 +117,104 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
   const [calcResults, setCalcResults] = useState<Record<string, any>>({});
   const [showResults, setShowResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, Set<string>>>({});
+
+  // Enhanced card data state for detailed textual information
+  const [detailedCards, setDetailedCards] = useState<Record<string, any>>({});
+  const [loadingDetailedCards, setLoadingDetailedCards] = useState(false);
+
+  // Initialize with genius results if available
+  useEffect(() => {
+    console.log('🔍 COMPARISON MODAL: Initializing with genius results:', {
+      isGeniusFilterActive,
+      hasGeniusResults: !!geniusResults,
+      geniusResultsKeys: geniusResults ? Object.keys(geniusResults) : [],
+      sampleResult: geniusResults && Object.keys(geniusResults).length > 0 ? {
+        alias: Object.keys(geniusResults)[0],
+        netSavings: geniusResults[Object.keys(geniusResults)[0]]?.net_savings,
+        totalSavingsYearly: geniusResults[Object.keys(geniusResults)[0]]?.total_savings_yearly,
+        joiningFees: geniusResults[Object.keys(geniusResults)[0]]?.joining_fees
+      } : null
+    });
+    
+    if (isGeniusFilterActive && geniusResults) {
+      setCalcResults(geniusResults);
+      setShowResults(true);
+      setActiveTab('spending'); // Set default tab to spending comparison when opened via genius filter
+    }
+  }, [isGeniusFilterActive, geniusResults]);
+
+  // Fetch detailed card information from BankKaro API
+  useEffect(() => {
+    if (isOpen && selectedCards.length > 0) {
+      fetchDetailedCardInformation();
+    }
+  }, [isOpen, selectedCards]);
+
+  const fetchDetailedCardInformation = async () => {
+    setLoadingDetailedCards(true);
+    try {
+      console.log('🔍 COMPARISON MODAL: Fetching detailed card information for', selectedCards.length, 'cards');
+      
+      // Fetch all cards from BankKaro API
+      const response = await fetch('https://bk-api.bankkaro.com/sp/api/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: "",
+          banks_ids: [],
+          card_networks: [],
+          annualFees: "",
+          credit_score: "",
+          sort_by: "",
+          free_cards: "",
+          eligiblityPayload: {},
+          cardGeniusPayload: {}
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch card details from BankKaro API');
+      }
+
+      const data = await response.json();
+      const allCards = Array.isArray(data) ? data : data.cards || data.data?.cards || [];
+      
+      console.log('🔍 COMPARISON MODAL: Fetched', allCards.length, 'cards from BankKaro API');
+
+      // Create a map of detailed card information
+      const detailedCardsMap: Record<string, any> = {};
+      
+      selectedCards.forEach(selectedCard => {
+        // Find matching card in BankKaro API response
+        const matchingCard = allCards.find((apiCard: any) => 
+          apiCard.seo_card_alias === selectedCard.seo_card_alias || 
+          apiCard.id === selectedCard.id
+        );
+        
+        if (matchingCard) {
+          console.log('🔍 COMPARISON MODAL: Found detailed info for', selectedCard.name);
+          detailedCardsMap[selectedCard.id] = matchingCard;
+        } else {
+          console.log('🔍 COMPARISON MODAL: No detailed info found for', selectedCard.name, 'using basic info');
+          detailedCardsMap[selectedCard.id] = selectedCard;
+        }
+      });
+
+      setDetailedCards(detailedCardsMap);
+      console.log('🔍 COMPARISON MODAL: Detailed cards map created:', Object.keys(detailedCardsMap));
+      
+    } catch (error) {
+      console.error('🔍 COMPARISON MODAL: Error fetching detailed card information:', error);
+      // Fallback to using basic card information
+      const fallbackMap: Record<string, any> = {};
+      selectedCards.forEach(card => {
+        fallbackMap[card.id] = card;
+      });
+      setDetailedCards(fallbackMap);
+    } finally {
+      setLoadingDetailedCards(false);
+    }
+  };
 
   // Debug effect to monitor calcValues changes
   useEffect(() => {
@@ -248,7 +348,7 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
     // Extract key savings values from API response
     processed.total_savings_yearly = extractValueByTag(cardData, 'total_savings_yearly') || 0;
     processed.joining_fees = extractValueByTag(cardData, 'joining_fees') || 0;
-    processed.net_savings = extractValueByTag(cardData, 'roi') || (processed.total_savings_yearly - processed.joining_fees);
+    processed.net_savings = processed.total_savings_yearly - processed.joining_fees;
     
     // Extract spending breakdown from API response
     if (cardData.spending_breakdown_array && Array.isArray(cardData.spending_breakdown_array)) {
@@ -323,6 +423,42 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
     return match ? Number(match[1]) : null;
   };
 
+  // Extract text content by tag (for textual information)
+  const extractTextByTag = (cardData: any, tag: string): string => {
+    // Search in product_usps array
+    if (cardData.product_usps && Array.isArray(cardData.product_usps)) {
+      const uspItem = cardData.product_usps.find((item: any) => 
+        item.tag === tag || 
+        (item.description && item.description.toLowerCase().includes(tag.replace('_', ' ')))
+      );
+      if (uspItem) {
+        return uspItem.description || uspItem.comment || '';
+      }
+    }
+    
+    // Search in any nested arrays
+    const searchInArrays = (obj: any): string | null => {
+      for (const key in obj) {
+        if (Array.isArray(obj[key])) {
+          const item = obj[key].find((item: any) => 
+            item.tag === tag || 
+            (item.description && item.description.toLowerCase().includes(tag.replace('_', ' ')))
+          );
+          if (item) {
+            return item.description || item.comment || '';
+          }
+        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+          const result = searchInArrays(obj[key]);
+          if (result !== null) return result;
+        }
+      }
+      return null;
+    };
+    
+    const result = searchInArrays(cardData);
+    return result || '';
+  };
+
   // Handle spending calculation submit
   const handleCalcSubmit = async () => {
     setCalcLoading(true);
@@ -352,7 +488,7 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
       console.log('Starting API calls with stable values:', {
         calcValues: stableCalcValues,
         visibleKeys: stableVisibleKeys,
-        selectedCards: selectedCards.map(c => ({ name: c.name, alias: c.seo_card_alias }))
+        selectedCards: selectedCards.map(c => ({ name: c.name, seo_card_alias: c.seo_card_alias }))
       });
       
       // Calculate for each selected card with proper error handling and validation
@@ -574,6 +710,23 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
     }
   };
 
+  // Card description mapping based on joining_fee_offset
+  const getCardDescription = (joiningFeeOffset?: string): string => {
+    if (!joiningFeeOffset) return "Experience premium benefits with this credit card designed for your lifestyle.";
+    
+    const descriptions: Record<string, string> = {
+      "0": "Perfect for beginners! This card offers great value with no joining fee and essential benefits to start your credit journey.",
+      "500": "Excellent value proposition! This card provides premium features at an affordable joining fee, making it ideal for regular users.",
+      "1000": "Premium experience awaits! This card offers exclusive benefits and rewards that justify the joining fee for serious credit card users.",
+      "1500": "Luxury meets functionality! This premium card delivers exceptional benefits and exclusive perks for discerning customers.",
+      "2000": "Ultimate premium experience! This elite card offers the highest tier benefits and exclusive access to premium services.",
+      "2500": "Exclusive luxury card! This ultra-premium offering provides unmatched benefits and elite status for high-net-worth individuals.",
+      "3000": "The pinnacle of credit cards! This ultimate premium card offers unparalleled benefits and exclusive access to the finest services."
+    };
+    
+    return descriptions[joiningFeeOffset] || "Experience premium benefits with this credit card designed for your lifestyle.";
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       {/* Backdrop */}
@@ -647,19 +800,30 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
               </TabsList>
             </div>
 
-            <TabsContent value="textual" className="p-4 space-y-6">
-              {/* Basic Information Section */}
-              <UICard className="shadow-card border-l-4 border-blue-500">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100">
-                  <CardTitle className="text-xl flex items-center">
-                    <CreditCard className="h-6 w-6 mr-3 text-blue-600" />
-                    Basic Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {selectedCards.map((card) => (
-                      <div key={card.id} className="space-y-4">
+            <TabsContent value="textual" className="space-y-6">
+              {loadingDetailedCards ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading detailed card information...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Basic Information Section */}
+                  <UICard className="shadow-card border-l-4 border-blue-500">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100">
+                      <CardTitle className="text-xl flex items-center">
+                        <CreditCard className="h-6 w-6 mr-3 text-blue-600" />
+                        Basic Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {selectedCards.map((card) => {
+                          const detailedCard = detailedCards[card.id] || card;
+                          return (
+                            <div key={card.id} className="space-y-4">
                         <div className="text-center">
                           <div className="w-32 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-3">
                             {card.image ? (
@@ -712,7 +876,8 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
                           </div>
                         </div>
                       </div>
-                    ))}
+                            );
+                          })}
                   </div>
                 </CardContent>
               </UICard>
@@ -762,50 +927,142 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
                 </CardContent>
               </UICard>
 
-              {/* Eligibility Section - Salaried */}
-              <UICard className="shadow-card border-l-4 border-purple-500">
-                <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100">
+              {/* Enhanced Eligibility Section - Exactly like CardDetail */}
+              <UICard className="shadow-card border-l-4 border-primary">
+                <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10">
                   <CardTitle className="text-xl flex items-center">
-                    <Shield className="h-6 w-6 mr-3 text-purple-600" />
-                    Eligibility Criteria - Salaried
+                    <Shield className="h-6 w-6 mr-3 text-primary" />
+                    Eligibility Criteria
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {selectedCards.map((card) => (
-                      <div key={card.id} className="space-y-4">
-                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                          <div className="flex items-center mb-2">
-                            <Calendar className="h-4 w-4 text-purple-600 mr-2" />
-                            <span className="text-sm font-medium text-purple-800">Age Criteria</span>
-                          </div>
-                          <span className="text-lg font-bold text-purple-900">
-                            {card.age_criteria || 'Not specified'}
-                          </span>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                          <div className="flex items-center mb-2">
-                            <TrendingUp className="h-4 w-4 text-purple-600 mr-2" />
-                            <span className="text-sm font-medium text-purple-800">Credit Rating</span>
-                          </div>
-                          <span className="text-lg font-bold text-purple-900">
-                            {card.crif || 'Not specified'}
-                          </span>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                          <div className="flex items-center mb-2">
-                            <DollarSign className="h-4 w-4 text-purple-600 mr-2" />
-                            <span className="text-sm font-medium text-purple-800">Income Criteria</span>
-                          </div>
-                          <span className="text-lg font-bold text-purple-900">
-                            {card.income_salaried || 'Not specified'}
-                          </span>
-                        </div>
+                  {/* Employment Status Tabs */}
+                  <Tabs defaultValue="salaried" className="mb-6">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="salaried">Salaried</TabsTrigger>
+                      <TabsTrigger value="self-employed">Self Employed</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="salaried" className="mt-6">
+                      {/* Eligibility Criteria Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {selectedCards.map((card) => {
+                          const detailedCard = detailedCards[card.id] || card;
+                          return (
+                            <div key={card.id} className="space-y-4">
+                              {/* Age Criteria Card */}
+                              <UICard className="shadow-lg border-l-4 border-blue-500 hover:shadow-xl transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-lg text-blue-900">Age Criteria</h3>
+                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                      <Calendar className="h-6 w-6 text-blue-600" />
+                                    </div>
+                                  </div>
+                                  <p className="text-2xl font-bold text-blue-800">
+                                    {card.age_criteria || 'Not specified'}
+                                  </p>
+                                  <p className="text-sm text-blue-600 mt-2">Minimum age requirement</p>
+                                </CardContent>
+                              </UICard>
+
+                              {/* Credit Score Card */}
+                              <UICard className="shadow-lg border-l-4 border-green-500 hover:shadow-xl transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-lg text-green-900">Credit Rating</h3>
+                                    <div className="p-2 bg-green-100 rounded-lg">
+                                      <TrendingUp className="h-6 w-6 text-green-600" />
+                                    </div>
+                                  </div>
+                                  <p className="text-2xl font-bold text-green-800">
+                                    {card.crif || 'Not specified'}
+                                  </p>
+                                  <p className="text-sm text-green-600 mt-2">Minimum credit score required</p>
+                                </CardContent>
+                              </UICard>
+
+                              {/* Income Criteria Card */}
+                              <UICard className="shadow-lg border-l-4 border-purple-500 hover:shadow-xl transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-lg text-purple-900">Salary Criteria</h3>
+                                    <div className="p-2 bg-purple-100 rounded-lg">
+                                      <DollarSign className="h-6 w-6 text-purple-600" />
+                                    </div>
+                                  </div>
+                                  <p className="text-2xl font-bold text-purple-800">
+                                    {card.income_salaried || 'Not specified'}
+                                  </p>
+                                  <p className="text-sm text-purple-600 mt-2">Minimum monthly income</p>
+                                </CardContent>
+                              </UICard>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="self-employed" className="mt-6">
+                      {/* Eligibility Criteria Cards for Self Employed */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {selectedCards.map((card) => {
+                          const detailedCard = detailedCards[card.id] || card;
+                          return (
+                            <div key={card.id} className="space-y-4">
+                              {/* Age Criteria Card */}
+                              <UICard className="shadow-lg border-l-4 border-blue-500 hover:shadow-xl transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-lg text-blue-900">Age Criteria</h3>
+                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                      <Calendar className="h-6 w-6 text-blue-600" />
+                                    </div>
+                                  </div>
+                                  <p className="text-2xl font-bold text-blue-800">
+                                    {card.age_self_emp || 'Not specified'}
+                                  </p>
+                                  <p className="text-sm text-blue-600 mt-2">Minimum age requirement</p>
+                                </CardContent>
+                              </UICard>
+
+                              {/* Credit Score Card */}
+                              <UICard className="shadow-lg border-l-4 border-green-500 hover:shadow-xl transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-lg text-green-900">Credit Rating</h3>
+                                    <div className="p-2 bg-green-100 rounded-lg">
+                                      <TrendingUp className="h-6 w-6 text-green-600" />
+                                    </div>
+                                  </div>
+                                  <p className="text-2xl font-bold text-green-800">
+                                    {card.crif_self_emp || 'Not specified'}
+                                  </p>
+                                  <p className="text-sm text-green-600 mt-2">Minimum credit score required</p>
+                                </CardContent>
+                              </UICard>
+
+                              {/* Income Criteria Card */}
+                              <UICard className="shadow-lg border-l-4 border-purple-500 hover:shadow-xl transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-lg text-purple-900">Income Criteria</h3>
+                                    <div className="p-2 bg-purple-100 rounded-lg">
+                                      <DollarSign className="h-6 w-6 text-purple-600" />
+                                    </div>
+                                  </div>
+                                  <p className="text-2xl font-bold text-purple-800">
+                                    {card.income_self_emp || 'Not specified'}
+                                  </p>
+                                  <p className="text-sm text-purple-600 mt-2">Minimum annual income</p>
+                                </CardContent>
+                              </UICard>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </UICard>
 
@@ -866,62 +1123,255 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selectedCards.map((card) => {
+                      const detailedCard = detailedCards[card.id] || card;
+                      return (
+                        <div key={card.id} className="space-y-4">
+                          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+                            <div className="flex items-center mb-2">
+                              <TrendingUp className="h-4 w-4 text-orange-600 mr-2" />
+                              <span className="text-sm font-medium text-orange-800">Points Value</span>
+                            </div>
+                            <span className="text-sm text-orange-900">
+                              {detailedCard.reward_conversion_rate || extractTextByTag(detailedCard, 'reward_conversion_rate') || 'Not specified'}
+                            </span>
+                          </div>
+                          
+                          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+                            <div className="flex items-center mb-2">
+                              <Award className="h-4 w-4 text-orange-600 mr-2" />
+                              <span className="text-sm font-medium text-orange-800">Redeem For</span>
+                            </div>
+                            <span className="text-sm text-orange-900">
+                              {detailedCard.redemption_options || extractTextByTag(detailedCard, 'redemption_options') || 'Not specified'}
+                            </span>
+                          </div>
+                          
+                          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+                            <div className="flex items-center mb-2">
+                              <Info className="h-4 w-4 text-orange-600 mr-2" />
+                              <span className="text-sm font-medium text-orange-800">Catalogue</span>
+                            </div>
+                            <div className="text-sm text-orange-900">
+                              {renderRedemptionCatalogue(detailedCard.redemption_catalogue)}
+                            </div>
+                          </div>
+                          
+                          <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+                            <div className="flex items-center mb-2">
+                              <X className="h-4 w-4 text-red-600 mr-2" />
+                              <span className="text-sm font-medium text-red-800">Exclusion Spends</span>
+                            </div>
+                            <ScrollArea className="h-24">
+                              <div className="text-sm text-red-900">
+                                {detailedCard.exclusion_spends ? (
+                                  <ul className="space-y-1">
+                                    {detailedCard.exclusion_spends.split(/\r?\n|,|•|\u2022/).map((item, idx) => {
+                                      const trimmed = item.trim();
+                                      return trimmed ? (
+                                        <li key={idx} className="flex items-start">
+                                          <span className="w-1 h-1 bg-red-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                                          <span>{trimmed}</span>
+                                        </li>
+                                      ) : null;
+                                    })}
+                                  </ul>
+                                ) : (
+                                  <span>Not specified</span>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </UICard>
+
+              {/* Key Features & Benefits Section */}
+              <UICard className="shadow-card border-l-4 border-pink-500">
+                <CardHeader className="bg-gradient-to-r from-pink-50 to-pink-100">
+                  <CardTitle className="text-xl flex items-center">
+                    <Sparkles className="h-6 w-6 mr-3 text-pink-600" />
+                    Key Features & Benefits
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {selectedCards.map((card) => (
                       <div key={card.id} className="space-y-4">
-                        <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-                          <div className="flex items-center mb-2">
-                            <TrendingUp className="h-4 w-4 text-orange-600 mr-2" />
-                            <span className="text-sm font-medium text-orange-800">Points Value</span>
+                        {/* Key Features */}
+                        {card.key_features && card.key_features.length > 0 && (
+                          <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-lg border border-pink-200">
+                            <div className="flex items-center mb-3">
+                              <div className="p-2 bg-pink-200 rounded-lg mr-3">
+                                <Zap className="h-4 w-4 text-pink-700" />
+                              </div>
+                              <h3 className="font-bold text-pink-900">Key Features</h3>
+                            </div>
+                            <div className="space-y-2">
+                              {card.key_features.map((feature: string, idx: number) => (
+                                <div key={idx} className="flex items-start">
+                                  <span className="w-1.5 h-1.5 bg-pink-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                                  <span className="text-pink-800 text-sm">{feature}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <span className="text-sm text-orange-900">
-                            {card.reward_conversion_rate || 'Not specified'}
-                          </span>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-                          <div className="flex items-center mb-2">
-                            <Award className="h-4 w-4 text-orange-600 mr-2" />
-                            <span className="text-sm font-medium text-orange-800">Redeem For</span>
+                        )}
+
+                        {/* Benefits */}
+                        {card.benefits && card.benefits.length > 0 && (
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                            <div className="flex items-center mb-3">
+                              <div className="p-2 bg-blue-200 rounded-lg mr-3">
+                                <Award className="h-4 w-4 text-blue-700" />
+                              </div>
+                              <h3 className="font-bold text-blue-900">Benefits</h3>
+                            </div>
+                            <div className="space-y-2">
+                              {card.benefits.map((benefit: string, idx: number) => (
+                                <div key={idx} className="flex items-start">
+                                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                                  <span className="text-blue-800 text-sm">{benefit}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <span className="text-sm text-orange-900">
-                            {card.redemption_options || 'Not specified'}
-                          </span>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-                          <div className="flex items-center mb-2">
-                            <Info className="h-4 w-4 text-orange-600 mr-2" />
-                            <span className="text-sm font-medium text-orange-800">Catalogue</span>
+                        )}
+
+                        {/* Rewards Structure */}
+                        {card.rewards && typeof card.rewards === 'object' && Object.keys(card.rewards).length > 0 && (
+                          <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                            <div className="flex items-center mb-3">
+                              <div className="p-2 bg-green-200 rounded-lg mr-3">
+                                <TrendingUp className="h-4 w-4 text-green-700" />
+                              </div>
+                              <h3 className="font-bold text-green-900">Rewards Structure</h3>
+                            </div>
+                            <div className="space-y-2">
+                              {Object.entries(card.rewards).map(([category, value], idx: number) => (
+                                <div key={idx} className="flex items-center justify-between">
+                                  <span className="text-green-800 text-sm font-medium">{category}:</span>
+                                  <span className="text-green-700 text-sm">{String(value)}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div className="text-sm text-orange-900">
-                            {renderRedemptionCatalogue(card.redemption_catalogue)}
+                        )}
+
+                        {/* Product USPs */}
+                        {(() => {
+                          const detailedCard = detailedCards[card.id] || card;
+                          return detailedCard.product_usps && detailedCard.product_usps.length > 0 ? (
+                            detailedCard.product_usps.map((usp: any, idx: number) => (
+                              <div key={idx} className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                                <div className="flex items-center mb-3">
+                                  <div className="p-2 bg-purple-200 rounded-lg mr-3">
+                                    <Star className="h-4 w-4 text-purple-700" />
+                                  </div>
+                                  <h3 className="font-bold text-purple-900">
+                                    {usp.header || usp.name || `USP ${idx + 1}`}
+                                  </h3>
+                                </div>
+                                <p className="text-purple-800 leading-relaxed text-sm">
+                                  {usp.description || usp.comment || (typeof usp === 'string' ? usp : JSON.stringify(usp))}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
+                              <p className="text-gray-600 text-sm">No additional USPs available</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </UICard>
+
+              {/* Lounge Access & Insurance Section */}
+              <UICard className="shadow-card border-l-4 border-indigo-500">
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-indigo-100">
+                  <CardTitle className="text-xl flex items-center">
+                    <Shield className="h-6 w-6 mr-3 text-indigo-600" />
+                    Lounge Access & Insurance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selectedCards.map((card) => {
+                      const detailedCard = detailedCards[card.id] || card;
+                      return (
+                        <div key={card.id} className="space-y-4">
+                          {/* Lounge Access */}
+                        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
+                          <div className="flex items-center mb-3">
+                            <div className="p-2 bg-indigo-200 rounded-lg mr-3">
+                              <Home className="h-4 w-4 text-indigo-700" />
+                            </div>
+                            <h3 className="font-bold text-indigo-900">Lounge Access</h3>
                           </div>
-                        </div>
-                        
-                        <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
-                          <div className="flex items-center mb-2">
-                            <X className="h-4 w-4 text-red-600 mr-2" />
-                            <span className="text-sm font-medium text-red-800">Exclusion Spends</span>
-                          </div>
-                          <ScrollArea className="h-24">
-                            <div className="text-sm text-red-900">
-                              {card.exclusion_spends ? (
-                                <ul className="space-y-1">
-                                  {card.exclusion_spends.split(/\r?\n|,|•|\u2022/).map((item, idx) => {
-                                    const trimmed = item.trim();
-                                    return trimmed ? (
-                                      <li key={idx} className="flex items-start">
-                                        <span className="w-1 h-1 bg-red-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                                        <span>{trimmed}</span>
-                                      </li>
-                                    ) : null;
-                                  })}
-                                </ul>
-                              ) : (
-                                <span>Not specified</span>
+                          {card.lounge_access ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-indigo-800 text-sm">Domestic:</span>
+                                <Badge variant={card.lounge_access.domestic ? "default" : "secondary"} className="text-xs">
+                                  {card.lounge_access.domestic ? "Available" : "Not Available"}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-indigo-800 text-sm">International:</span>
+                                <Badge variant={card.lounge_access.international ? "default" : "secondary"} className="text-xs">
+                                  {card.lounge_access.international ? "Available" : "Not Available"}
+                                </Badge>
+                              </div>
+                              {card.lounge_access.count && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-indigo-800 text-sm">Count:</span>
+                                  <span className="text-indigo-700 text-sm font-medium">{card.lounge_access.count}</span>
+                                </div>
                               )}
                             </div>
-                          </ScrollArea>
+                          ) : (
+                            <p className="text-indigo-600 text-sm">Lounge access information not available</p>
+                          )}
+                        </div>
+
+                        {/* Insurance Coverage */}
+                        <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg border border-teal-200">
+                          <div className="flex items-center mb-3">
+                            <div className="p-2 bg-teal-200 rounded-lg mr-3">
+                              <Shield className="h-4 w-4 text-teal-700" />
+                            </div>
+                            <h3 className="font-bold text-teal-900">Insurance Coverage</h3>
+                          </div>
+                          {card.insurance ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-teal-800 text-sm">Travel:</span>
+                                <Badge variant={card.insurance.travel ? "default" : "secondary"} className="text-xs">
+                                  {card.insurance.travel ? "Available" : "Not Available"}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-teal-800 text-sm">Health:</span>
+                                <Badge variant={card.insurance.health ? "default" : "secondary"} className="text-xs">
+                                  {card.insurance.health ? "Available" : "Not Available"}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-teal-800 text-sm">Life:</span>
+                                <Badge variant={card.insurance.life ? "default" : "secondary"} className="text-xs">
+                                  {card.insurance.life ? "Available" : "Not Available"}
+                                </Badge>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-teal-600 text-sm">Insurance information not available</p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -929,42 +1379,307 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ isOpen, onClose, sele
                 </CardContent>
               </UICard>
 
-              {/* Product USPs Section */}
-              {selectedCards.some(card => card.product_usps && card.product_usps.length > 0) && (
-                <UICard className="shadow-card border-l-4 border-pink-500">
-                  <CardHeader className="bg-gradient-to-r from-pink-50 to-pink-100">
+              {/* Exclusion Earnings Section */}
+              {selectedCards.some(card => {
+                const detailedCard = detailedCards[card.id] || card;
+                return detailedCard.exclusion_earnings || extractTextByTag(detailedCard, 'exclusion_earnings');
+              }) && (
+                <UICard className="shadow-card border-l-4 border-red-500">
+                  <CardHeader className="bg-gradient-to-r from-red-50 to-red-100">
                     <CardTitle className="text-xl flex items-center">
-                      <Sparkles className="h-6 w-6 mr-3 text-pink-600" />
+                      <XCircle className="h-6 w-6 mr-3 text-red-600" />
+                      Exclusion Earnings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {selectedCards.map((card) => {
+                        const detailedCard = detailedCards[card.id] || card;
+                        const exclusionEarnings = detailedCard.exclusion_earnings || extractTextByTag(detailedCard, 'exclusion_earnings');
+                        return (
+                          <div key={card.id} className="space-y-4">
+                            <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+                              <div className="flex items-center mb-3">
+                                <div className="p-2 bg-red-200 rounded-lg mr-3">
+                                  <XCircle className="h-4 w-4 text-red-700" />
+                                </div>
+                                <h3 className="font-bold text-red-900">Excluded from Rewards</h3>
+                              </div>
+                              <ScrollArea className="h-32">
+                                {exclusionEarnings ? (
+                                  <ul className="space-y-2">
+                                    {exclusionEarnings.split(/\r?\n|,|•|\u2022/).map((item, idx) => {
+                                      const trimmed = item.trim();
+                                      return trimmed ? (
+                                        <li key={idx} className="flex items-start">
+                                          <span className="w-1 h-1 bg-red-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                                          <span className="text-red-800 text-sm">{trimmed}</span>
+                                        </li>
+                                      ) : null;
+                                    })}
+                                  </ul>
+                                ) : (
+                                  <p className="text-red-600 text-sm">No exclusions specified</p>
+                                )}
+                              </ScrollArea>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </UICard>
+              )}
+
+              {/* Card Description Section */}
+              <UICard className="shadow-card border-l-4 border-yellow-500">
+                <CardHeader className="bg-gradient-to-r from-yellow-50 to-yellow-100">
+                  <CardTitle className="text-xl flex items-center">
+                    <Info className="h-6 w-6 mr-3 text-yellow-600" />
+                    Card Description
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selectedCards.map((card) => {
+                      const detailedCard = detailedCards[card.id] || card;
+                      return (
+                        <div key={card.id} className="space-y-4">
+                          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                            <div className="flex items-center mb-3">
+                              <div className="p-2 bg-yellow-200 rounded-lg mr-3">
+                                <CreditCard className="h-4 w-4 text-yellow-700" />
+                              </div>
+                              <h3 className="font-bold text-yellow-900">About This Card</h3>
+                            </div>
+                            <p className="text-yellow-800 leading-relaxed text-sm">
+                              {getCardDescription(card.joining_fee_offset)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </UICard>
+
+              {/* Enhanced How To Redeem Section - Exactly like CardDetail */}
+              <UICard className="shadow-card border-l-4 border-green-500">
+                <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
+                  <CardTitle className="text-xl flex items-center">
+                    <Award className="h-6 w-6 mr-3 text-green-600" />
+                    How To Redeem Rewards
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selectedCards.map((card) => {
+                      const detailedCard = detailedCards[card.id] || card;
+                      return (
+                        <div key={card.id} className="space-y-4">
+                          {/* Rewards Conversion Rate */}
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                            <div className="flex items-center mb-4">
+                              <div className="p-2 bg-blue-200 rounded-lg mr-3">
+                                <TrendingUp className="h-5 w-5 text-blue-700" />
+                              </div>
+                              <h3 className="font-bold text-lg text-blue-900">Points Value</h3>
+                            </div>
+                            <p className="text-blue-800 leading-relaxed">
+                              {card.reward_conversion_rate || 'Not specified'}
+                            </p>
+                          </div>
+
+                          {/* Redemption Options */}
+                          <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
+                            <div className="flex items-center mb-4">
+                              <div className="p-2 bg-green-200 rounded-lg mr-3">
+                                <Award className="h-5 w-5 text-green-700" />
+                              </div>
+                              <h3 className="font-bold text-lg text-green-900">Redeem For</h3>
+                            </div>
+                            <p className="text-green-800 leading-relaxed">
+                              {card.redemption_options || 'Not specified'}
+                            </p>
+                          </div>
+
+                          {/* Redemption Catalogue */}
+                          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
+                            <div className="flex items-center mb-4">
+                              <div className="p-2 bg-purple-200 rounded-lg mr-3">
+                                <Info className="h-5 w-5 text-purple-700" />
+                              </div>
+                              <h3 className="font-bold text-lg text-purple-900">Catalogue</h3>
+                            </div>
+                            <div className="text-purple-800 leading-relaxed">
+                              {card.redemption_catalogue ? (
+                                (() => {
+                                  // Check if the text contains a URL
+                                  const urlRegex = /(https?:\/\/[^\s]+)/g;
+                                  const match = card.redemption_catalogue.match(urlRegex);
+                                  
+                                  if (match && match[0]) {
+                                    return (
+                                      <div className="space-y-2">
+                                        <p>{card.redemption_catalogue.replace(urlRegex, '').trim()}</p>
+                                        <a 
+                                          href={match[0]} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center text-purple-600 hover:text-purple-800 font-medium underline transition-colors"
+                                        >
+                                          Click here
+                                          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                          </svg>
+                                        </a>
+                                      </div>
+                                    );
+                                  } else {
+                                    return <p>{card.redemption_catalogue}</p>;
+                                  }
+                                })()
+                              ) : (
+                                <p>Not specified</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </UICard>
+
+              {/* Enhanced Exclusion Sections - Exactly like CardDetail */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <UICard className="shadow-card border-l-4 border-red-500">
+                  <CardHeader className="bg-gradient-to-r from-red-50 to-red-100">
+                    <CardTitle className="text-xl flex items-center">
+                      <XCircle className="h-6 w-6 mr-3 text-red-600" />
+                      Exclusion Earnings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {selectedCards.map((card) => {
+                        const detailedCard = detailedCards[card.id] || card;
+                        const exclusionEarnings = detailedCard.exclusion_earnings || extractTextByTag(detailedCard, 'exclusion_earnings');
+                        return (
+                          <div key={card.id} className="space-y-4">
+                            {exclusionEarnings ? (
+                              <ScrollArea className="h-48">
+                                <ul className="space-y-3">
+                                  {exclusionEarnings.split(/\r?\n|,|•|\u2022/).map((item, idx) => {
+                                    const trimmed = item.trim();
+                                    return trimmed ? (
+                                      <li key={idx} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                                        <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                                        <span className="text-red-800 font-medium">{trimmed}</span>
+                                      </li>
+                                    ) : null;
+                                  })}
+                                </ul>
+                              </ScrollArea>
+                            ) : (
+                              <div className="text-center py-8">
+                                <XCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <span className="text-gray-500">No exclusions specified</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </UICard>
+                
+                <UICard className="shadow-card border-l-4 border-orange-500">
+                  <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100">
+                    <CardTitle className="text-xl flex items-center">
+                      <XCircle className="h-6 w-6 mr-3 text-orange-600" />
+                      Exclusion Spends
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {selectedCards.map((card) => {
+                        const detailedCard = detailedCards[card.id] || card;
+                        return (
+                          <div key={card.id} className="space-y-4">
+                            {detailedCard.exclusion_spends ? (
+                              <ScrollArea className="h-48">
+                                <ul className="space-y-3">
+                                  {detailedCard.exclusion_spends.split(/\r?\n|,|•|\u2022/).map((item, idx) => {
+                                    const trimmed = item.trim();
+                                    return trimmed ? (
+                                      <li key={idx} className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                        <XCircle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                                        <span className="text-orange-800 font-medium">{trimmed}</span>
+                                      </li>
+                                    ) : null;
+                                  })}
+                                </ul>
+                              </ScrollArea>
+                            ) : (
+                              <div className="text-center py-8">
+                                <XCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <span className="text-gray-500">No exclusions specified</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </UICard>
+              </div>
+
+              {/* Enhanced Product USPs Section - Exactly like CardDetail */}
+              {selectedCards.some(card => {
+                const detailedCard = detailedCards[card.id] || card;
+                return Array.isArray(detailedCard.product_usps) && detailedCard.product_usps.length > 0;
+              }) && (
+                <UICard className="shadow-card border-l-4 border-indigo-500">
+                  <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                    <CardTitle className="text-xl flex items-center">
+                      <Sparkles className="h-6 w-6 mr-3 text-indigo-600" />
                       Product USPs & Features
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {selectedCards.map((card) => (
-                        <div key={card.id} className="space-y-4">
-                          {card.product_usps && card.product_usps.length > 0 ? (
-                            card.product_usps.map((usp: any, idx: number) => (
-                              <div key={idx} className="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-lg border border-pink-200">
-                                <div className="flex items-center mb-3">
-                                  <div className="p-2 bg-pink-200 rounded-lg mr-3">
-                                    <Zap className="h-4 w-4 text-pink-700" />
+                      {selectedCards.map((card) => {
+                        const detailedCard = detailedCards[card.id] || card;
+                        return (
+                          <div key={card.id} className="space-y-4">
+                            {Array.isArray(detailedCard.product_usps) && detailedCard.product_usps.length > 0 ? (
+                              <div className="grid md:grid-cols-2 gap-6">
+                                {detailedCard.product_usps.map((usp: any, idx: number) => (
+                                  <div key={idx} className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-200 hover:shadow-lg transition-shadow">
+                                    <div className="flex items-center mb-4">
+                                      <div className="p-2 bg-indigo-200 rounded-lg mr-3">
+                                        <Zap className="h-5 w-5 text-indigo-700" />
+                                      </div>
+                                      <h3 className="font-bold text-lg text-indigo-900">
+                                        {usp.header || usp.name || `Feature ${idx + 1}`}
+                                      </h3>
+                                    </div>
+                                    <p className="text-indigo-800 leading-relaxed">
+                                      {usp.description || usp.comment || (typeof usp === 'string' ? usp : JSON.stringify(usp))}
+                                    </p>
                                   </div>
-                                  <h3 className="font-bold text-pink-900">
-                                    {usp.header || usp.name || `Feature ${idx + 1}`}
-                                  </h3>
-                                </div>
-                                <p className="text-pink-800 leading-relaxed text-sm">
-                                  {usp.description || usp.comment || (typeof usp === 'string' ? usp : JSON.stringify(usp))}
-                                </p>
+                                ))}
                               </div>
-                            ))
-                          ) : (
-                            <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-4 rounded-lg border border-pink-200">
-                              <p className="text-pink-800 text-sm">No USPs available</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            ) : (
+                              <div className="text-center py-8">
+                                <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                                <span className="text-gray-500">No features available</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </UICard>

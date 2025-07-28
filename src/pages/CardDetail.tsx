@@ -81,6 +81,33 @@ const getAnnualFeeDescription = (annualFeeWaiver?: string): string => {
   }
 };
 
+// Helper function to get tips for each spending category
+const getCategoryTip = (categoryKey: string): string => {
+  const tips: Record<string, string> = {
+    amazon_spends: "Include all purchases from Amazon - electronics, books, household items, etc.",
+    flipkart_spends: "Include all purchases from Flipkart - fashion, electronics, home goods, etc.",
+    other_online_spends: "Include Myntra, Nykaa, other e-commerce sites, online subscriptions",
+    other_offline_spends: "Include local shops, supermarkets, department stores, cash purchases",
+    grocery_spends_online: "Include Blinkit, Zepto, BigBasket, Grofers, and other grocery delivery apps",
+    online_food_ordering: "Include Swiggy, Zomato, food delivery apps, and online restaurant orders",
+    fuel: "Include petrol, diesel, CNG expenses at fuel stations",
+    dining_or_going_out: "Include restaurant bills, cafes, bars, food courts, and dining out expenses",
+    flights_annual: "Include domestic and international flight bookings, air tickets",
+    hotels_annual: "Include hotel bookings, resorts, homestays, accommodation expenses",
+    domestic_lounge_usage_quarterly: "Number of times you visit domestic airport lounges per year",
+    international_lounge_usage_quarterly: "Number of times you visit international airport lounges per year",
+    mobile_phone_bills: "Include mobile recharge, postpaid bills, internet bills, broadband",
+    electricity_bills: "Include electricity bills, power consumption charges",
+    water_bills: "Include water bills, municipal water charges",
+    insurance_health_annual: "Include health insurance, term insurance, life insurance premiums",
+    insurance_car_or_bike_annual: "Include car insurance, bike insurance, vehicle insurance premiums",
+    rent: "Include house rent, office rent, property rental expenses",
+    school_fees: "Include school fees, college fees, tuition fees, education expenses"
+  };
+  
+  return tips[categoryKey] || "Enter your typical spending amount for this category";
+};
+
 // Enhanced category mapping with proper API tag structure
 const SPENDING_CATEGORY_MAPPING = {
   // Shopping & Online
@@ -362,7 +389,7 @@ const CardDetail = () => {
     // Extract key savings values from API response with proper tag mapping
     processed.total_savings_yearly = extractValueByTag(cardData, 'total_savings_yearly') || 0;
     processed.joining_fees = extractValueByTag(cardData, 'joining_fees') || 0;
-    processed.net_savings = extractValueByTag(cardData, 'roi') || (processed.total_savings_yearly - processed.joining_fees);
+    processed.net_savings = processed.total_savings_yearly - processed.joining_fees;
     
     console.log('Extracted values:', {
       total_savings_yearly: processed.total_savings_yearly,
@@ -653,7 +680,7 @@ const CardDetail = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          alias: card.seo_card_alias,
+          seo_card_alias: card.seo_card_alias,
           pincode: eligibilityForm.pincode,
           inhandIncome: eligibilityForm.inhandIncome,
           empStatus: eligibilityForm.empStatus,
@@ -1263,12 +1290,11 @@ const CardDetail = () => {
                 <CardContent className="p-6">
                   <div className="mb-8">
                     <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold text-gray-800 mb-2">Select Your Spending Categories</h3>
-                      <p className="text-gray-600">Choose the categories that match your spending habits</p>
-                      <div className="mt-3">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                          {selectedCategories.length} of {CATEGORY_QUESTIONS.length} selected
-                        </span>
+                      <h3 className="text-2xl font-bold text-gray-800 mb-2">Step 1: Select Your Spending Categories</h3>
+                      <p className="text-gray-600 mb-4">Choose the categories that match your spending habits</p>
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <Info className="h-4 w-4" />
+                        {selectedCategories.length} of {CATEGORY_QUESTIONS.length} categories selected
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -1276,7 +1302,7 @@ const CardDetail = () => {
                         <Button 
                           key={cat.name}
                           variant={selectedCategories.includes(cat.name) ? "default" : "outline"}
-                          className={`h-auto p-6 flex flex-col items-center space-y-3 rounded-xl transition-all duration-300 ${
+                          className={`h-auto p-6 flex flex-col items-center space-y-3 rounded-xl transition-all duration-300 relative ${
                             selectedCategories.includes(cat.name) 
                               ? "bg-primary text-white shadow-xl scale-105 border-2 border-primary animate-category-select" 
                               : "hover:shadow-lg hover:scale-105 border-2 border-gray-200 hover:border-primary/30 bg-white"
@@ -1303,28 +1329,45 @@ const CardDetail = () => {
                       </div>
                     )}
                   </div>
+                  
                   {/* Enhanced Dynamic Questions */}
                   <div className="space-y-6">
                     <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold text-gray-800 mb-2">Input Your Spending Amounts</h3>
+                      <h3 className="text-2xl font-bold text-gray-800 mb-2">Step 2: Input Your Spending Amounts</h3>
                       <p className="text-gray-600">Adjust the sliders or enter amounts directly for each category</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {visibleKeys.map(key => (
                         <div key={key} className="bg-white rounded-xl p-6 border-2 border-gray-200 hover:shadow-lg hover:border-primary/30 transition-all duration-300">
-                          <div className="flex items-center mb-4">
-                            <div className="p-2 bg-primary/10 rounded-full mr-3">
-                              <span className="text-lg">{QUESTION_META[key].icon || "💰"}</span>
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-primary/10 rounded-full">
+                                <span className="text-lg">{QUESTION_META[key].icon || "💰"}</span>
+                              </div>
+                              <div>
+                                <label className="font-semibold text-gray-800 text-lg block">
+                                  {QUESTION_META[key].label}
+                                </label>
+                                <p className="text-sm text-gray-500">
+                                  {key.includes("lounge") ? "Number of visits per year" : key.includes('annual') ? 'Annual spending' : 'Monthly spending'}
+                                </p>
+                              </div>
                             </div>
-                            <label className="font-semibold text-gray-800 text-lg">
-                              {QUESTION_META[key].label}
-                            </label>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-primary">
+                                ₹{calcValues[key].toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {key.includes("lounge") ? "visits/year" : key.includes('annual') ? 'per year' : 'per month'}
+                              </div>
+                            </div>
                           </div>
+                          
                           <div className="space-y-4">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm text-gray-600">Amount</span>
                               <span className="text-sm text-gray-500">
-                                {key.includes("lounge") ? "times" : key.includes('annual') ? 'per year' : 'per month'}
+                                {key.includes("lounge") ? "visits per year" : key.includes('annual') ? 'per year' : 'per month'}
                               </span>
                             </div>
                             <Slider
@@ -1357,10 +1400,21 @@ const CardDetail = () => {
                               </div>
                             </div>
                           </div>
+                          
+                          {/* Helpful tip for each category */}
+                          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 animate-tip-glow">
+                            <div className="flex items-start gap-2">
+                              <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                              <div className="text-sm text-blue-700">
+                                <strong>Tip:</strong> {getCategoryTip(key)}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
+                  
                   <div className="flex justify-center mt-12">
                     <div className="text-center">
                       <Button 
@@ -1400,160 +1454,236 @@ const CardDetail = () => {
                   
                   {calcResult && (
                     <div id="calc-results" className="mt-8 animate-calculator-success">
-                      <UICard className="shadow-xl border-2 border-green-200 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 animate-result-glow">
+                      {/* Main Net Savings Card */}
+                      <UICard className="shadow-xl border-2 border-green-200 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 animate-result-glow mb-8">
                         <CardHeader className="text-center pb-4">
-                          <CardTitle className="text-3xl flex items-center justify-center gap-3 text-green-800 mb-2">
-                            <TrendingUp className="h-8 w-8" />
+                          <CardTitle className="text-4xl flex items-center justify-center gap-3 text-green-800 mb-2">
+                            <TrendingUp className="h-10 w-10" />
                             Net Annual Savings
                           </CardTitle>
-                          <p className="text-green-600 text-lg">Based on your spending profile</p>
+                          <p className="text-green-600 text-lg">Your actual savings after deducting all fees</p>
                         </CardHeader>
                         <CardContent className="text-center px-8 pb-8">
-                          {/* Main Savings Display */}
-                          <div className="mb-8">
-                            <div className="text-6xl font-bold text-green-700 mb-2 drop-shadow-sm">
-                              ₹{Number(calcResult.net_savings || (calcResult.total_savings_yearly - calcResult.joining_fees)).toLocaleString()}
+                          {/* Prominent Net Savings Display */}
+                          <div className="mb-8 animate-net-savings-highlight">
+                            <div className="text-7xl font-bold text-green-700 mb-4 drop-shadow-sm">
+                              ₹{Number(calcResult.total_savings_yearly - calcResult.joining_fees).toLocaleString()}
                             </div>
-                            <div className="text-green-600 text-lg">Your net savings after fees</div>
+                            <div className="text-green-600 text-xl font-medium">Net savings after all fees</div>
+                            <div className="flex items-center justify-center gap-2 mt-2">
+                              <Info className="h-4 w-4 text-green-600" />
+                              <span className="text-sm text-green-600">Net Savings = Total Annual Rewards - Joining Fee</span>
+                            </div>
                           </div>
                           
-                          {/* Key Metrics Cards */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                          {/* Calculation Breakdown Table */}
+                          <div className="bg-white rounded-xl p-6 shadow-lg border border-green-200 mb-8 animate-calculation-breakdown">
+                            <h4 className="text-lg font-semibold text-gray-800 mb-4 text-center">How We Calculate Your Savings</h4>
+                            <div className="overflow-x-auto">
+                              <Table className="w-full">
+                                <TableHeader>
+                                  <TableRow className="bg-gray-50">
+                                    <TableHead className="font-semibold text-gray-700">Component</TableHead>
+                                    <TableHead className="text-center font-semibold text-gray-700">Amount</TableHead>
+                                    <TableHead className="text-center font-semibold text-gray-700">Description</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  <TableRow className="border-b border-gray-100">
+                                    <TableCell className="font-medium text-green-700">Total Annual Rewards</TableCell>
+                                    <TableCell className="text-center font-bold text-green-700">
+                                      ₹{Number(calcResult.total_savings_yearly).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-gray-600">
+                                      Cashback, points, and benefits from all your spending categories
+                                    </TableCell>
+                                  </TableRow>
+                                  <TableRow className="border-b border-gray-100">
+                                    <TableCell className="font-medium text-red-600">Joining Fee</TableCell>
+                                    <TableCell className="text-center font-bold text-red-600">
+                                      -₹{Number(calcResult.joining_fees).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-gray-600">
+                                      One-time fee to get this card
+                                    </TableCell>
+                                  </TableRow>
+                                  <TableRow className="bg-green-50 border-2 border-green-200">
+                                    <TableCell className="font-bold text-lg text-green-800">Net Annual Savings</TableCell>
+                                    <TableCell className="text-center font-bold text-lg text-green-800">
+                                      ₹{Number(calcResult.total_savings_yearly - calcResult.joining_fees).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-green-700 font-medium">
+                                      Your actual savings after deducting joining fee
+                                    </TableCell>
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                          
+                          {/* Key Metrics Summary */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white rounded-xl p-6 shadow-lg border border-blue-200 hover:shadow-xl transition-shadow">
+                              <div className="flex items-center justify-center mb-3">
+                                <div className="p-2 bg-blue-100 rounded-full mr-3">
+                                  <DollarSign className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <span className="text-blue-700 font-semibold text-lg">Total Spending</span>
+                              </div>
+                              <div className="text-2xl font-bold text-blue-700 mb-1">
+                                ₹{calcResult.categoryBreakdown
+                                  ?.filter((item: any) => item.userAmount > 0)
+                                  .reduce((sum: number, item: any) => sum + (item.userAmount * (item.category.includes('annual') ? 1 : 12)), 0)
+                                  .toLocaleString() || '0'}
+                              </div>
+                              <span className="text-sm text-blue-600">Per year across all categories</span>
+                            </div>
                             <div className="bg-white rounded-xl p-6 shadow-lg border border-green-200 hover:shadow-xl transition-shadow">
                               <div className="flex items-center justify-center mb-3">
                                 <div className="p-2 bg-green-100 rounded-full mr-3">
                                   <TrendingUp className="h-5 w-5 text-green-600" />
                                 </div>
-                                <span className="text-green-700 font-semibold text-lg">Total Annual Savings</span>
+                                <span className="text-green-700 font-semibold text-lg">Net Saving Rate</span>
                               </div>
                               <div className="text-2xl font-bold text-green-700 mb-1">
-                                ₹{Number(calcResult.total_savings_yearly).toLocaleString()}
-                              </div>
-                              <span className="text-sm text-green-600">Per year</span>
-                            </div>
-                            <div className="bg-white rounded-xl p-6 shadow-lg border border-blue-200 hover:shadow-xl transition-shadow">
-                              <div className="flex items-center justify-center mb-3">
-                                <div className="p-2 bg-blue-100 rounded-full mr-3">
-                                  <CreditCard className="h-5 w-5 text-blue-600" />
-                                </div>
-                                <span className="text-blue-700 font-semibold text-lg">Joining Fees</span>
-                              </div>
-                              <div className="text-2xl font-bold text-blue-700 mb-1">
-                                ₹{Number(calcResult.joining_fees).toLocaleString()}
-                              </div>
-                              <span className="text-sm text-blue-600">One-time</span>
-                            </div>
-                          </div>
-                          
-                          {/* Spending Summary */}
-                          {calcResult.categoryBreakdown && calcResult.categoryBreakdown.length > 0 && (
-                            <div className="w-full mb-8">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-white rounded-xl p-6 shadow-lg border border-blue-200 hover:shadow-xl transition-shadow">
-                                  <div className="flex items-center mb-3">
-                                    <div className="p-2 bg-blue-100 rounded-full mr-3">
-                                      <DollarSign className="h-5 w-5 text-blue-600" />
-                                    </div>
-                                    <span className="text-blue-700 font-semibold text-lg">Your Total Spending</span>
-                                  </div>
-                                  <div className="text-2xl font-bold text-blue-700 mb-1">
-                                    ₹{calcResult.categoryBreakdown
+                                {calcResult.categoryBreakdown?.filter((item: any) => item.userAmount > 0).length > 0 
+                                  ? ((calcResult.net_savings / calcResult.categoryBreakdown
                                       .filter((item: any) => item.userAmount > 0)
-                                      .reduce((sum: number, item: any) => sum + (item.userAmount * (item.category.includes('annual') ? 1 : 12)), 0)
-                                      .toLocaleString()}
-                                  </div>
-                                  <div className="text-sm text-blue-600">
-                                    {calcResult.categoryBreakdown.filter((item: any) => item.userAmount > 0).length} categories • Per year
-                                  </div>
-                                </div>
-                                <div className="bg-white rounded-xl p-6 shadow-lg border border-green-200 hover:shadow-xl transition-shadow">
-                                  <div className="flex items-center mb-3">
-                                    <div className="p-2 bg-green-100 rounded-full mr-3">
-                                      <BarChart3 className="h-5 w-5 text-green-600" />
-                                    </div>
-                                    <span className="text-green-700 font-semibold text-lg">Potential Savings Rate</span>
-                                  </div>
-                                  <div className="text-2xl font-bold text-green-700 mb-1">
-                                    {calcResult.categoryBreakdown.filter((item: any) => item.userAmount > 0).length > 0 
-                                      ? ((calcResult.total_savings_yearly / calcResult.categoryBreakdown
-                                          .filter((item: any) => item.userAmount > 0)
-                                          .reduce((sum: number, item: any) => sum + (item.userAmount * (item.category.includes('annual') ? 1 : 12)), 0)) * 100).toFixed(1)
-                                      : '0'}%
-                                  </div>
-                                  <div className="text-sm text-green-600">of your spending • Average</div>
-                                </div>
+                                      .reduce((sum: number, item: any) => sum + (item.userAmount * (item.category.includes('annual') ? 1 : 12)), 0)) * 100).toFixed(1)
+                                  : '0'}%
                               </div>
+                              <span className="text-sm text-green-600">net return on your spending</span>
                             </div>
-                          )}
-                          
-                          {/* Enhanced Category Breakdown */}
-                          {calcResult.categoryBreakdown && calcResult.categoryBreakdown.length > 0 && (
-                            <div className="w-full mb-8">
-                              <h4 className="text-xl font-semibold text-gray-800 mb-6 text-center">Savings by Category</h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {calcResult.categoryBreakdown
-                                  .filter((item: any) => item.userAmount > 0)
-                                  .map((item: any, index: number) => (
-                                  <div key={index} className="bg-white rounded-xl p-4 shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 hover:scale-105">
-                                    <div className="text-center">
-                                      <div className="text-3xl mb-2">{item.icon}</div>
-                                      <div className="text-sm font-semibold text-gray-700 mb-2 line-clamp-2">{item.displayName}</div>
-                                      <div className="text-lg font-bold text-green-600 mb-1">
-                                        ₹{item.savings.toLocaleString()}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        {item.percentage.toFixed(1)}% of total
-                                      </div>
-                                      <div className="text-xs text-blue-600 mt-1">
-                                        ₹{item.userAmount.toLocaleString()}/month
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              {calcResult.categoryBreakdown.filter((item: any) => item.userAmount > 0).length === 0 && (
-                                <div className="text-center py-8">
-                                  <div className="text-gray-400 text-4xl mb-3">📊</div>
-                                  <p className="text-gray-500 text-lg">No spending data entered for breakdown</p>
-                                  <p className="text-gray-400 text-sm mt-2">Add your spending amounts above to see category-wise savings</p>
+                            <div className="bg-white rounded-xl p-6 shadow-lg border border-purple-200 hover:shadow-xl transition-shadow">
+                              <div className="flex items-center justify-center mb-3">
+                                <div className="p-2 bg-purple-100 rounded-full mr-3">
+                                  <BarChart3 className="h-5 w-5 text-purple-600" />
                                 </div>
-                              )}
+                                <span className="text-purple-700 font-semibold text-lg">Active Categories</span>
+                              </div>
+                              <div className="text-2xl font-bold text-purple-700 mb-1">
+                                {calcResult.categoryBreakdown?.filter((item: any) => item.userAmount > 0).length || 0}
+                              </div>
+                              <span className="text-sm text-purple-600">Categories with spending</span>
                             </div>
-                          )}
-                          
-                          {/* Action Buttons */}
-                          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <Button 
-                              onClick={() => navigate(`/card-savings-detail/${card.seo_card_alias}`, { 
-                                state: { 
-                                  card, 
-                                  calcResult, 
-                                  calcResultList, 
-                                  calcValues,
-                                  selectedCategories 
-                                } 
-                              })}
-                              className="bg-primary hover:bg-primary/90 text-white font-semibold px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
-                            >
-                              <TrendingUp className="h-5 w-5 mr-2" />
-                              View Detailed Breakdown
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onClick={() => {
-                                const element = document.getElementById('calc-all-results');
-                                if (element) {
-                                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }
-                              }}
-                              className="border-2 border-green-200 text-green-700 hover:bg-green-50 font-semibold px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
-                            >
-                              <BarChart3 className="h-5 w-5 mr-2" />
-                              Compare with Other Cards
-                            </Button>
                           </div>
                         </CardContent>
                       </UICard>
+
+                                                                          {/* Enhanced Savings by Category Section - COMMENTED OUT */}
+                          {/* 
+                          {calcResult.categoryBreakdown && calcResult.categoryBreakdown.length > 0 && (
+                            <UICard className="shadow-lg border-l-4 border-blue-500 mb-8">
+                              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100">
+                                <CardTitle className="text-xl flex items-center gap-2 text-blue-800">
+                                  <BarChart3 className="h-6 w-6" />
+                                  Savings by Category
+                                </CardTitle>
+                                <p className="text-blue-600 text-sm">
+                                  See how much you save in each spending category with detailed calculations
+                                </p>
+                              </CardHeader>
+                              <CardContent className="p-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  {calcResult.categoryBreakdown
+                                    .filter((item: any) => item.userAmount > 0)
+                                    .map((item: any, index: number) => (
+                                    <div key={index} className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
+                                      <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                          <div className="text-3xl">{item.icon}</div>
+                                          <div>
+                                            <h4 className="font-semibold text-gray-800 text-lg">{item.displayName}</h4>
+                                            <p className="text-sm text-gray-600">Monthly spending: ₹{item.userAmount.toLocaleString()}</p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-2xl font-bold text-green-600">
+                                            ₹{item.savings.toLocaleString()}
+                                          </div>
+                                          <div className="text-sm text-gray-500">Annual savings</div>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                        <h5 className="font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                          <Info className="h-4 w-4 text-blue-500" />
+                                          How we calculate this:
+                                        </h5>
+                                        <div className="space-y-2 text-sm">
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Monthly spending:</span>
+                                            <span className="font-medium">₹{item.userAmount.toLocaleString()}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Annual spending:</span>
+                                            <span className="font-medium">₹{(item.userAmount * (item.category.includes('annual') ? 1 : 12)).toLocaleString()}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Reward rate:</span>
+                                            <span className="font-medium">{item.rewardRate || 'Varies'}%</span>
+                                          </div>
+                                          <div className="flex justify-between border-t border-gray-200 pt-2">
+                                            <span className="font-medium text-green-700">Annual savings:</span>
+                                            <span className="font-bold text-green-700">₹{item.savings.toLocaleString()}</span>
+                                          </div>
+                                        </div>
+                                        <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded border border-blue-100">
+                                          <strong>Formula:</strong> Annual Spending × Reward Rate = Annual Savings
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="flex justify-between text-xs text-gray-500">
+                                        <span>{item.percentage.toFixed(1)}% of total savings</span>
+                                        <span>{item.category.includes('annual') ? 'Annual' : 'Monthly'} category</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                
+                                {calcResult.categoryBreakdown.filter((item: any) => item.userAmount > 0).length === 0 && (
+                                  <div className="text-center py-8">
+                                    <div className="text-gray-400 text-4xl mb-3">📊</div>
+                                    <p className="text-gray-500 text-lg">No spending data entered for breakdown</p>
+                                    <p className="text-gray-400 text-sm mt-2">Add your spending amounts above to see category-wise savings</p>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </UICard>
+                          )}
+                          */}
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          onClick={() => navigate(`/card-savings-detail/${card.seo_card_alias}`, { 
+                            state: { 
+                              card, 
+                              calcResult, 
+                              calcResultList, 
+                              calcValues,
+                              selectedCategories 
+                            } 
+                          })}
+                          className="bg-primary hover:bg-primary/90 text-white font-semibold px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                        >
+                          <TrendingUp className="h-5 w-5 mr-2" />
+                          View Detailed Breakdown
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            const element = document.getElementById('calc-all-results');
+                            if (element) {
+                              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }}
+                          className="border-2 border-green-200 text-green-700 hover:bg-green-50 font-semibold px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                        >
+                          <BarChart3 className="h-5 w-5 mr-2" />
+                          Compare with Other Cards
+                        </Button>
+                      </div>
                     </div>
                   )}
                   {calcResultList.length > 0 && (
@@ -1775,3 +1905,5 @@ const CardDetail = () => {
 };
 
 export default CardDetail;
+
+

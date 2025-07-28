@@ -384,7 +384,14 @@ class CardService {
         );
         
         if (cardData) {
-          console.log('API Service: Found card data:', cardData);
+          console.log('API Service: Found card data:', {
+            cardName: cardData.card_name || cardData.name,
+            cardAlias: cardData.seo_card_alias,
+            totalSavingsYearly: cardData.total_savings_yearly,
+            joiningFees: cardData.joining_fees,
+            netSavings: cardData.total_savings_yearly - cardData.joining_fees,
+            dataKeys: Object.keys(cardData)
+          });
           return cardData;
         } else {
           console.warn('API Service: Card not found in Card Genius data:', seoCardAlias);

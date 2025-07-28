@@ -3,7 +3,7 @@ import React from 'react';
 import { Card as UICard, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, MessageCircle, Plus, X, Eye, CreditCard, Users, TrendingUp } from 'lucide-react';
+import { Star, MessageCircle, Plus, X, Eye, CreditCard, Users, TrendingUp, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/services/api';
 
@@ -16,6 +16,9 @@ interface CardItemProps {
   isInCompareList: boolean;
   canAddToCompare: boolean;
   eligibleAliases?: string[];
+  geniusResults?: Record<string, any>;
+  isGeniusFilterActive?: boolean;
+  onSeeDetails?: (card: Card) => void;
 }
 
 const CardItem: React.FC<CardItemProps> = ({ 
@@ -26,8 +29,23 @@ const CardItem: React.FC<CardItemProps> = ({
   onRemoveFromCompare,
   isInCompareList,
   canAddToCompare,
-  eligibleAliases
+  eligibleAliases,
+  geniusResults,
+  isGeniusFilterActive,
+  onSeeDetails
 }) => {
+  // Debug logging
+  console.log('CardItem props for', card.name, ':', {
+    isGeniusFilterActive,
+    hasGeniusResults: !!geniusResults,
+    cardAlias: card.seo_card_alias,
+    geniusResultForCard: geniusResults?.[card.seo_card_alias],
+    netSavings: geniusResults?.[card.seo_card_alias]?.net_savings,
+    totalSavingsYearly: geniusResults?.[card.seo_card_alias]?.total_savings_yearly,
+    joiningFees: geniusResults?.[card.seo_card_alias]?.joining_fees,
+    availableAliases: geniusResults ? Object.keys(geniusResults) : []
+  });
+
   const formatRating = (rating: number) => {
     return rating.toFixed(1);
   };
@@ -173,6 +191,60 @@ const CardItem: React.FC<CardItemProps> = ({
                 </div>
               </div>
 
+              {/* Net Savings Display (when Genius Filter is active) */}
+                          {(() => {
+              const shouldShow = isGeniusFilterActive && geniusResults && geniusResults[card.seo_card_alias];
+              const result = geniusResults?.[card.seo_card_alias];
+              console.log('Net Savings Display check for', card.name, ':', {
+                isGeniusFilterActive,
+                hasGeniusResults: !!geniusResults,
+                hasResultForCard: !!result,
+                cardAlias: card.seo_card_alias,
+                availableAliases: geniusResults ? Object.keys(geniusResults) : [],
+                resultKeys: result ? Object.keys(result) : [],
+                netSavings: result?.net_savings,
+                totalSavingsYearly: result?.total_savings_yearly,
+                joiningFees: result?.joining_fees,
+                shouldShow,
+                calculation: result ? `${result.total_savings_yearly || 0} - ${result.joining_fees || 0} = ${result.net_savings || 0}` : 'N/A'
+              });
+              return shouldShow;
+                        })() && (
+              <div className="mb-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-800">Net Saving (Yearly):</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 text-green-600 hover:text-green-800 hover:bg-green-100"
+                        title="Net Saving = Total Yearly Savings - Joining Fees"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="text-right">
+                                        <div className="text-lg font-bold text-green-700">
+                    ₹{(() => {
+                      const result = geniusResults[card.seo_card_alias];
+                      const netSavings = (result.total_savings_yearly - result.joining_fees) || 0;
+                      return netSavings.toLocaleString();
+                    })()}
+                  </div>
+                      <div className="text-xs text-green-600">
+                        After joining fees
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-green-700">
+                    Total Savings: ₹{(geniusResults[card.seo_card_alias].total_savings_yearly || 0).toLocaleString()} | 
+                    Joining Fees: ₹{(geniusResults[card.seo_card_alias].joining_fees || 0).toLocaleString()}
+                  </div>
+                </div>
+              )}
+
               {/* Key Features Preview */}
               {card.key_features && card.key_features.length > 0 && (
                 <div className="space-y-1 mb-2">
@@ -232,6 +304,20 @@ const CardItem: React.FC<CardItemProps> = ({
                 View Details
               </Link>
             </Button>
+            
+            {/* See Details button when Genius Filter is active */}
+            {isGeniusFilterActive && geniusResults && geniusResults[card.seo_card_alias] && (
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                onClick={() => {
+                  onSeeDetails?.(card);
+                }}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                See Details
+              </Button>
+            )}
             {/* Eligibility Strip (moved below View Details button) */}
             {isEligible && (
               <div className="w-full flex items-center justify-center mt-2">

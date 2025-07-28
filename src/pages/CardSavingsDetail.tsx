@@ -44,7 +44,9 @@ import {
   Home as HomeIcon,
   PieChart,
   Activity,
-  ChevronDown
+  ChevronDown,
+  Minus,
+  Info
 } from "lucide-react";
 import { Card as CardType } from "@/services/api";
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -616,7 +618,7 @@ const CardSavingsDetail = () => {
     );
   }
 
-  const netSavings = Number(calcResult.net_savings || (calcResult.total_savings_yearly - calcResult.joining_fees) || 0);
+  const netSavings = Number(calcResult.total_savings_yearly - calcResult.joining_fees);
   const topCards = calcResultList
     .map(card => ({
       ...card,
@@ -717,6 +719,68 @@ const CardSavingsDetail = () => {
                       ₹{netSavings.toLocaleString()}
                     </div>
                     <p className="text-xs text-green-600 mt-1">After fees</p>
+                    <div className="flex items-center justify-center gap-1 mt-2">
+                      <Info className="h-3 w-3 text-green-600" />
+                      <span className="text-xs text-green-600">Total Rewards - Joining Fee</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </UICard>
+        </div>
+
+        {/* Calculation Explanation Section */}
+        <div className="mb-8">
+          <UICard className="shadow-lg border-l-4 border-blue-500">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100">
+              <CardTitle className="text-xl flex items-center gap-2 text-blue-800">
+                <Calculator className="h-6 w-6" />
+                How We Calculate Your Savings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-xl p-4 border border-blue-200">
+                  <div className="flex items-center mb-3">
+                    <Target className="h-5 w-5 text-green-600 mr-2" />
+                    <span className="font-semibold text-green-700">Total Annual Rewards</span>
+                  </div>
+                  <div className="text-lg font-bold text-green-800 mb-1">
+                    ₹{Number(calcResult.total_savings_yearly).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-gray-600">Cashback, points, and benefits from all categories</p>
+                </div>
+                
+                <div className="bg-white rounded-xl p-4 border border-red-200">
+                  <div className="flex items-center mb-3">
+                    <Minus className="h-5 w-5 text-red-600 mr-2" />
+                    <span className="font-semibold text-red-700">Joining Fee</span>
+                  </div>
+                  <div className="text-lg font-bold text-red-800 mb-1">
+                    ₹{Number(calcResult.joining_fees).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-gray-600">One-time fee to get this card</p>
+                </div>
+                
+                <div className="bg-white rounded-xl p-4 border-2 border-green-200 bg-green-50">
+                  <div className="flex items-center mb-3">
+                    <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
+                    <span className="font-semibold text-green-700">Net Annual Savings</span>
+                  </div>
+                  <div className="text-lg font-bold text-green-800 mb-1">
+                    ₹{netSavings.toLocaleString()}
+                  </div>
+                  <p className="text-sm text-gray-600">Your actual savings after deducting joining fee</p>
+                </div>
+              </div>
+              
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-800">
+                    <strong>Formula:</strong> Net Savings = Total Annual Rewards - Joining Fee<br/>
+                    <strong>Why this matters:</strong> This shows your actual savings after accounting for the one-time joining fee. It's the most accurate representation of the card's value to you.
                   </div>
                 </div>
               </div>
