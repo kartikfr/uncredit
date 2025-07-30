@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CreditCard, Star, Users, ArrowLeft, CheckCircle, XCircle, Info, Calendar, DollarSign, TrendingUp, Sparkles, Award, Shield, Zap, Home, Calculator, BarChart3 } from "lucide-react";
-import { Card as CardType } from "@/services/api";
+import { Card as CardType, cardService } from "@/services/api";
 import ScrollToTop from "@/components/ui/ScrollToTop";
 
 
@@ -676,43 +676,30 @@ const CardDetail = () => {
     setShowFailureMessage(false);
     
     try {
-      const res = await fetch('https://bk-api.bankkaro.com/sp/api/cg-eligiblity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          seo_card_alias: card.seo_card_alias,
-          pincode: eligibilityForm.pincode,
-          inhandIncome: eligibilityForm.inhandIncome,
-          empStatus: eligibilityForm.empStatus,
-        }),
+      const result = await cardService.checkCardSpecificEligibility(card.seo_card_alias, {
+        pincode: eligibilityForm.pincode,
+        inhandIncome: eligibilityForm.inhandIncome,
+        empStatus: eligibilityForm.empStatus,
       });
       
-      if (!res.ok) throw new Error('Failed to check eligibility');
-      
-      const data = await res.json();
-      if (!data || !Array.isArray(data.data)) throw new Error('Invalid response');
-      
-      const eligible = data.data.filter((c: any) => c.eligible && c.seo_card_alias).map((c: any) => c.seo_card_alias);
-      
-      if (!eligible.length) {
+      if (result.isEligible) {
+        // User is eligible
+        setEligibleCount(1);
+        setIsEligible(true);
+        setShowCongrats(true);
+        
+        setTimeout(() => {
+          setShowEligibilityModal(false);
+          setShowCongrats(false);
+        }, 2000);
+      } else {
         // User is not eligible - show failure message and close modal
         setShowFailureMessage(true);
         setTimeout(() => {
           setShowEligibilityModal(false);
           setShowFailureMessage(false);
         }, 3000);
-        return;
       }
-      
-      // User is eligible
-      setEligibleCount(eligible.length);
-      setIsEligible(true);
-      setShowCongrats(true);
-      
-      setTimeout(() => {
-        setShowEligibilityModal(false);
-        setShowCongrats(false);
-      }, 2000);
     } catch (err: any) {
       setEligibilityError(err.message || 'Something went wrong');
     } finally {
